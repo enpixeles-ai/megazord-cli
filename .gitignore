@@ -13,3 +13,4 @@ _dispatch/
 .DS_Store
 node_modules/
 *.log
+LAUNCH-KIT.md
