@@ -14,3 +14,4 @@ _dispatch/
 node_modules/
 *.log
 LAUNCH-KIT.md
+assets/demo.cast
