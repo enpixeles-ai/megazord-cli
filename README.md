@@ -1,19 +1,38 @@
 <div align="center">
 
-# 🦖 Megazord CLI
+<img src="assets/banner.svg" alt="Megazord CLI — four AI coding CLIs, one council" width="100%">
 
-### Four AI coding CLIs. One council. They debate, agree, and combine to build.
+<br><br>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-F5B301.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A518-3B82F6.svg)](package.json)
+![Dependencies](https://img.shields.io/badge/dependencies-0-E5484D.svg)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-A855F7.svg)](CONTRIBUTING.md)
+[![Stars](https://img.shields.io/github/stars/enpixeles-ai/megazord-cli?style=social)](https://github.com/enpixeles-ai/megazord-cli)
 
 **Megazord convenes Claude, Codex, Kimi and Gemini** as a team: they each analyze your task, critique each other's proposals, reach a single arbitrated directive, and then **split the work by strength and build it** — with automatic verification gates.
 
 It runs on the **CLI subscriptions you already pay for** — not per-token API keys.
 
-```
+```bash
 megazord "how do I make this API 3x faster without breaking auth?"     # debate → directive
 megazord mission "add rate limiting to the login endpoint"             # debate → plan → BUILD
 ```
 
 [Quick start](#-quick-start) · [How it works](#-how-it-works) · [Commands](#-commands) · [FAQ](#-faq)
+
+</div>
+
+---
+
+## 🎬 See it in action
+
+<div align="center">
+
+<!-- 👉 Replace with your GIF: record with `asciinema rec demo.cast -c megazord-iniciate` then `agg demo.cast assets/demo.gif` -->
+<img src="assets/demo.gif" alt="Megazord in action — the four Zords form up and build in parallel" width="80%">
+
+<i>The four Zords form up, debate, split the work, and build — each pane a live agent.</i>
 
 </div>
 
