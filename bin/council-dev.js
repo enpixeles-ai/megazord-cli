@@ -14,7 +14,11 @@ import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
-const VERSION = "0.8.0";
+const VERSION = "0.9.0";
+
+// Output language of the council. Default English (public repo); set
+// MEGAZORD_LANG=es (or COUNCIL_LANG=es) for Spanish.
+const LANG = /^es/i.test(process.env.MEGAZORD_LANG || process.env.COUNCIL_LANG || "en") ? "es" : "en";
 const DEFAULT_TIMEOUT_MS = 180_000;
 const MAX_PARALLEL = 3; // cap de obreros simultaneos en fan-out
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -433,7 +437,8 @@ function parseClaude(stdout) {
 //  Prompts (espanol neutro)                                                    //
 // --------------------------------------------------------------------------- //
 function basePrompt(task) {
-  return `Participas en un consejo tecnico de cuatro CLIs (Claude, Codex, Kimi, Gemini). Responde en espanol neutro latinoamericano (tuteo: tu, tienes, puedes, aqui; nada de voseo).
+  if (LANG === "es") {
+    return `Participas en un consejo tecnico de cuatro CLIs (Claude, Codex, Kimi, Gemini). Responde en espanol neutro latinoamericano (tuteo: tu, tienes, puedes, aqui; nada de voseo).
 
 TAREA:
 ${task}
@@ -448,30 +453,62 @@ Reglas:
   ## Analisis y riesgos
   ## Criterios de verificacion
 - Se especifico (archivos, comandos, pasos). Nada de relleno.`;
+  }
+  return `You are on a technical council of four AI CLIs (Claude, Codex, Kimi, Gemini). Respond in clear, concise English.
+
+TASK:
+${task}
+
+Rules:
+- Do NOT edit files. Only inspect the repo if needed.
+- Don't guess paths/APIs/behavior: mark anything you're unsure about as an assumption.
+- Deliver a concrete proposal with these markdown sections:
+  ## Methodology
+  ## Pipeline
+  ## Workflow
+  ## Analysis and risks
+  ## Verification criteria
+- Be specific (files, commands, steps). No filler.`;
 }
 
 function critiquePrompt(task, proposals) {
-  return `${basePrompt(task)}
+  const label = LANG === "es" ? "Propuesta" : "Proposal";
+  const empty = LANG === "es" ? "[sin salida]" : "[no output]";
+  const others = proposals.map((p, i) => `### ${label} ${i + 1}\n${capForPrompt(p.text || p.stderr || empty)}`).join("\n\n");
+  if (LANG === "es") {
+    return `${basePrompt(task)}
 
 PROPUESTAS DE LOS OTROS ASESORES (anonimas):
-${proposals.map((p, i) => `### Propuesta ${i + 1}\n${capForPrompt(p.text || p.stderr || "[sin salida]")}`).join("\n\n")}
+${others}
 
 Ahora: 1) critica fallos, supuestos fragiles y riesgos de las otras propuestas; 2) reescribe y mejora TU propuesta integrando lo bueno. Manten las mismas secciones.`;
+  }
+  return `${basePrompt(task)}
+
+THE OTHER ADVISORS' PROPOSALS (anonymized):
+${others}
+
+Now: 1) critique the flaws, fragile assumptions and risks in the other proposals; 2) rewrite and improve YOUR proposal, integrating what's good. Keep the same sections.`;
 }
 
 // El ARBITRO es Claude. Produce la directriz en espanol + un plan JSON con el
 // reparto por fortalezas que execute usara para rutear cada paso.
 function arbiterPrompt(task, firstRound, critiques) {
-  return `Eres el Arquitecto Principal (Claude) y tienes la ultima palabra tecnica. Espanol neutro (tuteo, sin voseo). Recibiste la tarea y las propuestas refinadas del consejo. Sintetiza UNA directriz unica y accionable. No promedies: elige lo mejor de cada propuesta y justifica breve.
+  const empty = LANG === "es" ? "[sin salida]" : "[no output]";
+  const r1 = firstRound.map((p) => `## ${p.agent}\n${capForPrompt(p.text || p.stderr || empty)}`).join("\n\n");
+  const crit = critiques.map((p) => `## ${p.agent}\n${capForPrompt(p.text || p.stderr || empty)}`).join("\n\n");
+
+  if (LANG === "es") {
+    return `Eres el Arquitecto Principal (Claude) y tienes la ultima palabra tecnica. Espanol neutro (tuteo, sin voseo). Recibiste la tarea y las propuestas refinadas del consejo. Sintetiza UNA directriz unica y accionable. No promedies: elige lo mejor de cada propuesta y justifica breve.
 
 TAREA ORIGINAL:
 ${task}
 
 PROPUESTAS RONDA 1:
-${firstRound.map((p) => `## ${p.agent}\n${capForPrompt(p.text || p.stderr || "[sin salida]")}`).join("\n\n")}
+${r1}
 
 CRITICAS / REFINAMIENTO:
-${critiques.map((p) => `## ${p.agent}\n${capForPrompt(p.text || p.stderr || "[sin salida]")}`).join("\n\n")}
+${crit}
 
 Entrega DOS partes:
 
@@ -508,6 +545,54 @@ REGLAS DE BALANCE (el gate las mira y Manuel audita el reparto):
 - Distribuye a los 4 owners cuando la tarea lo permita; un plan donde 1 owner tiene >50% de los pasos requiere justificacion explicita en la PARTE A.
 - Piensa en PARALELO: pasos disjuntos entre owners distintos terminan antes que pasos apilados en un solo owner.
 Cada "instruccion" debe ser autocontenida (el CLI asignado solo recibe ese texto).`;
+  }
+
+  return `You are the Principal Architect (Claude) with the final technical say. Respond in clear English. You received the task and the council's refined proposals. Synthesize ONE single, actionable directive. Don't average: pick the best of each proposal and justify briefly.
+
+ORIGINAL TASK:
+${task}
+
+ROUND 1 PROPOSALS:
+${r1}
+
+CRITIQUES / REFINEMENT:
+${crit}
+
+Deliver TWO parts:
+
+PART A — Directive in markdown:
+## Decision
+## Execution plan (numbered steps)
+## Affected files
+## Work split
+## Verification (real command)
+## Remaining risk
+
+PART B — Executable plan in a SINGLE \`\`\`json block at the very end, with this exact shape (the "pasos" key name must be kept literally — the engine parses it):
+{"pasos":[{"owner":"claude|codex|kimi|gemini","titulo":"...","instruccion":"self-contained order","archivos":["relative/path.ext"],"verify":"verification command"}]}
+
+HARD rules of the plan (the engine validates and rejects on failure):
+- "archivos": list of concrete RELATIVE paths that step will touch. NO globs
+  (* ? [ ]). To run steps in parallel, steps must touch DISJOINT files (two steps
+  must NOT declare the same file). If two tasks touch the same file, make them ONE
+  step or assign different files.
+- "verify": a REAL verification command for the step (test/lint/compile). It must
+  start with one of: node, npm, npx, php, composer, phpunit, artisan, python,
+  python3, pytest, ruff, go, cargo, make, tsc, eslint, jest, vitest, bash -n.
+  No semicolons, pipes, &&, or redirections. E.g. "node --check src/x.js",
+  "php artisan test --filter=Foo", "pytest tests/test_x.py".
+
+Work split by strength (chain of command: you -> Claude -> Codex/Kimi/Gemini):
+- owner "claude" (🦖 Tyranno): ONLY steps needing critical production judgment (auth, money, customer data, final integration). It's the referee: it must NOT hog the build.
+- owner "codex" (🐘 Mastodon): the most precise editor. Surgical refactors, tests, single-file fixes, delicate logic in existing code.
+- owner "kimi" (🛡️ Triceratops): the volume workhorse. NEW files, scaffolding, mechanical migrations, processing, Python.
+- owner "gemini" (🦅 Pterodactyl): research, QA, E2E tests, documentation, multimodal review.
+
+BALANCE RULES (the gate checks these):
+- "claude" may own AT MOST 40% of the steps, and NEVER more steps than codex+kimi combined. If a step goes to claude, its instruccion must start by justifying in one line WHY it needs critical judgment.
+- Distribute across the 4 owners when the task allows; a plan where one owner has >50% of steps requires explicit justification in PART A.
+- Think in PARALLEL: disjoint steps across different owners finish faster than steps piled on one owner.
+Each "instruccion" must be self-contained (the assigned CLI only receives that text).`;
 }
 
 function normalizeStep(step) {
@@ -676,9 +761,16 @@ async function runConsensus(task, repo, options) {
 // Ejecuta UN paso ya normalizado (owner resuelto por normalizeOwner). Solo rutea.
 async function executeStep(step, repo, options) {
   const owner = CLI_PROFILES[step.owner] ? step.owner : "claude";
+  const files = step.archivos?.join(", ");
   const alcance = step.archivos?.length
-    ? `\n\nToca SOLO estos archivos: ${step.archivos.join(", ")}. No toques otros.` : "";
-  const prompt = `Eres ${owner.toUpperCase()} ejecutando un paso de una directriz YA APROBADA por Manuel. Espanol neutro. Haz EXACTAMENTE esto y nada mas; manten el cambio acotado:
+    ? (LANG === "es"
+        ? `\n\nToca SOLO estos archivos: ${files}. No toques otros.`
+        : `\n\nTouch ONLY these files: ${files}. Do not touch others.`)
+    : "";
+  const header = LANG === "es"
+    ? `Eres ${owner.toUpperCase()} ejecutando un paso de una directriz YA APROBADA por Manuel. Espanol neutro. Haz EXACTAMENTE esto y nada mas; manten el cambio acotado:`
+    : `You are ${owner.toUpperCase()} executing a step of an ALREADY-APPROVED directive. Respond and code in English. Do EXACTLY this and nothing more; keep the change scoped:`;
+  const prompt = `${header}
 
 ${step.instruccion}${alcance}`;
 

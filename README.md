@@ -155,6 +155,8 @@ Under the hood everything is the `council-dev` engine — `megazord` is a friend
 
 **Which OS?** macOS and Linux (the underlying CLIs target those). Node 18+.
 
+**Can it answer in another language?** Yes. Output is English by default; set `MEGAZORD_LANG=es` for Spanish. (More languages are easy to add — see `basePrompt`/`arbiterPrompt`.)
+
 **Can I add another model?** Yes — the adapter layer is small. PRs welcome.
 
 ## 🤝 Contributing
