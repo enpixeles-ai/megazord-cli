@@ -23,7 +23,7 @@ npm i -g megazord-cli
 or from source:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/megazord-cli
+git clone https://github.com/enpixeles-ai/megazord-cli
 cd megazord-cli
 ./install.sh
 ```

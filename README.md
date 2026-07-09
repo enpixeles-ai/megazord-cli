@@ -54,7 +54,7 @@ Then log into each one once (`claude`, `codex`, `kimi login`, `gemini`). Megazor
 ```bash
 npm i -g megazord-cli
 # or from source:
-git clone https://github.com/YOUR_USERNAME/megazord-cli && cd megazord-cli && ./install.sh
+git clone https://github.com/enpixeles-ai/megazord-cli && cd megazord-cli && ./install.sh
 ```
 
 ### 3. Check your roster
