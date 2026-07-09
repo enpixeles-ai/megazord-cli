@@ -24,7 +24,7 @@ or from source:
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/megazord-cli
-cd megazord
+cd megazord-cli
 ./install.sh
 ```
 
