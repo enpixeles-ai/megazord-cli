@@ -34,7 +34,7 @@ megazord mission "add rate limiting to the login endpoint"             # debate 
 <!-- 👉 Replace with your GIF: record with `asciinema rec demo.cast -c megazord-iniciate` then `agg demo.cast assets/demo.gif` -->
 <img src="assets/demo.gif" alt="Megazord in action — the four Zords form up and build in parallel" width="80%">
 
-<i>The four Zords form up, debate, split the work, and build — each pane a live agent.</i>
+<i>A stylized intro animation of the flow: the Zords assemble, debate, split the work by strength, and build.</i>
 
 </div>
 
@@ -141,7 +141,7 @@ Under the hood everything is the `council-dev` engine — `megazord` is a friend
 ## 🎬 Extras
 
 - **`megazord-chamber`** — a live 2×2 "Power Chamber" that shows each Zord working in its own pane.
-- **`megazord-iniciate`** — a cinematic terminal animation of the Zords forming up (great for demos/reels; 100% simulated, spends nothing).
+- **`megazord-iniciate`** — a cinematic ASCII intro animation of the Zords forming up. A fun splash screen for demos and streams.
 
 ## ❓ FAQ
 
