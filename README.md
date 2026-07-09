@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦖 MEGAZORD
+# 🦖 Megazord CLI
 
 ### Four AI coding CLIs. One council. They debate, agree, and combine to build.
 
@@ -54,7 +54,7 @@ Then log into each one once (`claude`, `codex`, `kimi login`, `gemini`). Megazor
 ```bash
 npm i -g megazord-cli
 # or from source:
-git clone https://github.com/YOUR_USERNAME/megazord && cd megazord && ./install.sh
+git clone https://github.com/YOUR_USERNAME/megazord-cli && cd megazord && ./install.sh
 ```
 
 ### 3. Check your roster
