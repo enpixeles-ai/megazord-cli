@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/power-hero.gif" alt="Megazord CLI mascot powering up" width="300">
+
 <img src="assets/banner.svg" alt="Megazord CLI — four AI coding CLIs, one council" width="100%">
 
 <br><br>
