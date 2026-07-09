@@ -84,6 +84,8 @@ git clone https://github.com/enpixeles-ai/megazord-cli && cd megazord-cli && ./i
 megazord            # 🦖 roll call — shows which Zords are online
 ```
 
+<div align="center"><img src="assets/rollcall.gif" alt="megazord roll call — the four Zords online" width="70%"></div>
+
 ### 4. Use it
 
 ```bash
