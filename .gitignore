@@ -1,0 +1,15 @@
+# transcripciones y logs de corridas
+.council-dev/
+_dispatch/
+
+# secretos — NUNCA subir
+.env
+*.env
+.config/
+**/telegram-token
+**/*token*
+
+# sistema
+.DS_Store
+node_modules/
+*.log

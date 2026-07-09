@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# 🎬 MEGAZORD DEMO — simulación visual para grabar reels. No ejecuta nada real.
+R='\033[1;31m'; B='\033[1;34m'; K='\033[1;90m'; P='\033[1;35m'; G='\033[1;32m'
+Y='\033[1;33m'; C='\033[1;36m'; W='\033[1;97m'; D='\033[2m'; N='\033[0m'
+
+type_out() { local t="$1"; for ((i=0;i<${#t};i++)); do printf "%b" "${t:$i:1}"; sleep 0.012; done; echo; }
+bar() { local label="$1" color="$2"; printf "%b%-14s%b [" "$color" "$label" "$N"
+  for i in $(seq 1 24); do printf "%b█%b" "$color" "$N"; sleep 0.03; done; printf "] %b100%%%b\n" "$G" "$N"; }
+
+clear
+echo
+printf "${Y}"
+cat <<'A'
+  ███╗   ███╗███████╗ ██████╗  █████╗ ███████╗ ██████╗ ██████╗ ██████╗
+  ████╗ ████║██╔════╝██╔════╝ ██╔══██╗╚══███╔╝██╔═══██╗██╔══██╗██╔══██╗
+  ██╔████╔██║█████╗  ██║  ███╗███████║  ███╔╝ ██║   ██║██████╔╝██║  ██║
+  ██║╚██╔╝██║██╔══╝  ██║   ██║██╔══██║ ███╔╝  ██║   ██║██╔══██╗██║  ██║
+  ██║ ╚═╝ ██║███████╗╚██████╔╝██║  ██║███████╗╚██████╔╝██║  ██║██████╔╝
+  ╚═╝     ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝
+A
+printf "${N}"
+printf "${W}          ⚡ I N I C I A T E ⚡${N}\n"
+printf "${D}          4 inteligencias artificiales · 1 solo equipo${N}\n\n"
+sleep 1
+
+type_out "$(printf "${W}⚡ Se requiere poder Megazord... invocando a los Zords${N}")"
+echo; sleep 0.6
+
+printf "${R}🦖 TYRANNO ZORD${N}    ${D}(Claude · arquitecto)${N}"; sleep 0.8; printf "  ${G}✔ EN LÍNEA${N}\n"
+printf "${K}🐘 MASTODON ZORD${N}   ${D}(Codex · cirujano)${N}  "; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
+printf "${B}🛡  TRICERATOPS ZORD${N} ${D}(Kimi · volumen)${N}   "; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
+printf "${P}🦅 PTERODACTYL ZORD${N} ${D}(Gemini · visión)${N}  "; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
+echo; sleep 0.8
+
+type_out "$(printf "${Y}🧠 FASE 1 — Los 4 Zords analizan la misión...${N}")"
+sleep 0.4
+printf "${R}  Tyranno:${N} ${D}leyendo el código fuente... 680 líneas escaneadas${N}\n"; sleep 0.6
+printf "${B}  Triceratops:${N} ${D}detecté el bug en la línea 219 — la agenda pierde el estado${N}\n"; sleep 0.7
+printf "${K}  Mastodon:${N} ${D}propongo refactor quirúrgico + test de regresión${N}\n"; sleep 0.7
+printf "${P}  Pterodactyl:${N} ${D}objeción: falta validar la zona horaria del cliente${N}\n"; sleep 0.9
+echo
+
+type_out "$(printf "${Y}⚔️  FASE 2 — Debate cruzado (cada Zord ataca las propuestas del resto)...${N}")"
+sleep 0.5
+for f in "Tyranno vs Mastodon" "Triceratops vs Tyranno" "Pterodactyl vs todos"; do
+  printf "  ${C}⚡ %s${N}" "$f"; sleep 0.5; printf "  ${D}resuelto${N}\n"
+done
+echo; sleep 0.5
+
+type_out "$(printf "${W}👑 El arquitecto sintetiza UNA directriz. Reparto por fortalezas:${N}")"
+sleep 0.4
+printf "  ${R}Tyranno${N}     → núcleo crítico\n"; sleep 0.35
+printf "  ${K}Mastodon${N}    → refactor + tests\n"; sleep 0.35
+printf "  ${B}Triceratops${N} → módulo nuevo\n"; sleep 0.35
+printf "  ${P}Pterodactyl${N} → QA + documentación\n"
+echo; sleep 0.8
+
+type_out "$(printf "${G}🔧 FASE 3 — ¡MEGAZORD, FÓRMATE! Construcción en paralelo:${N}")"
+echo
+bar "🦖 Tyranno"     "$R"
+bar "🐘 Mastodon"    "$K"
+bar "🛡  Triceratops" "$B"
+bar "🦅 Pterodactyl"  "$P"
+echo; sleep 0.5
+
+printf "${D}  ✔ verify: tests........................${N} ${G}PASSED (21/21)${N}\n"; sleep 0.4
+printf "${D}  ✔ verify: compilación..................${N} ${G}0 ERRORES${N}\n"; sleep 0.4
+printf "${D}  ✔ gate: seguridad......................${N} ${G}SIN FUGAS${N}\n"; sleep 0.7
+echo
+printf "${G}"
+cat <<'A'
+   ██████╗ ██████╗ ███╗   ███╗██████╗ ██╗     ███████╗████████╗ ██████╗
+  ██╔════╝██╔═══██╗████╗ ████║██╔══██╗██║     ██╔════╝╚══██╔══╝██╔═══██╗
+  ██║     ██║   ██║██╔████╔██║██████╔╝██║     █████╗     ██║   ██║   ██║
+  ██║     ██║   ██║██║╚██╔╝██║██╔═══╝ ██║     ██╔══╝     ██║   ██║   ██║
+  ╚██████╗╚██████╔╝██║ ╚═╝ ██║██║     ███████╗███████╗   ██║   ╚██████╔╝
+   ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚══════╝╚══════╝   ╚═╝    ╚═════╝
+A
+printf "${N}"
+printf "${W}  🦖 Misión completada · acta enviada a Telegram · 4 IAs, 0 drama${N}\n"
+printf "${D}     EnPíxeles · agentes de IA que trabajan por ti${N}\n\n"
+sleep 0.6
+printf "${Y}  ═══════════════════════════════════════════════════${N}\n"
+sleep 0.3
+type_out "$(printf "${W}     \"Ningún poder en el universo puede vencer${N}")"
+type_out "$(printf "${W}      a un equipo unido. ¡Que la fuerza del${N}")"
+type_out "$(printf "${R}      Megazord${W} proteja tu misión!\"${N}")"
+sleep 0.4
+printf "${G}\n              ¡GO GO MEGAZORD! 🦖⚡${N}\n\n"
+
+# ── Encadena la Power Chamber simulada (los 4 Zords escribiendo código) ──
+if command -v megazord-chamber >/dev/null 2>&1; then
+  sleep 1.2
+  megazord-chamber
+fi

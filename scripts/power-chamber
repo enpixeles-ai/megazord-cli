@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# ⚡ POWER CHAMBER — abre la sala de control 2x2 de Warp con los 4 Zords,
+# apuntada a la carpeta que le digas (o la actual).
+#
+#   power-chamber              -> sala apuntada a la carpeta actual
+#   power-chamber /ruta/proyecto   -> apuntada a esa carpeta
+#
+# Cada panel hace tail -f de _dispatch/<zord>.log (se llenan cuando los Zords
+# trabajan en esa tarea). El 4º panel muestra los commits en vivo.
+set -euo pipefail
+
+DIR="${1:-$PWD}"
+DIR="$(cd "$DIR" 2>/dev/null && pwd)" || { echo "✗ Carpeta no existe: ${1:-$PWD}" >&2; exit 1; }
+
+# Cada proyecto tiene SU propia sala (nombre y archivo únicos) → varias a la vez.
+SLUG="$(basename "$DIR" | tr ' ' '-' | tr -cd '[:alnum:]._-')"
+CFGDIR="$HOME/.warp/launch_configurations"
+CFG="$CFGDIR/power-chamber-$SLUG.yaml"
+mkdir -p "$CFGDIR" "$DIR/_dispatch"
+for z in codex kimi gemini claude; do touch "$DIR/_dispatch/$z.log" 2>/dev/null || true; done
+
+cat > "$CFG" <<YAML
+---
+name: "⚡ Power Chamber · $SLUG"
+windows:
+  - tabs:
+      - title: "⚡ $SLUG — 4 Zords"
+        layout:
+          split_direction: horizontal
+          panes:
+            - split_direction: vertical
+              panes:
+                - cwd: "$DIR"
+                  commands:
+                    - exec: "clear; echo '=== ⚫ MASTODON / CODEX ==='; tail -n 40 -f _dispatch/codex.log"
+                - cwd: "$DIR"
+                  commands:
+                    - exec: "clear; echo '=== 🔵 TRICERATOPS / KIMI ==='; tail -n 40 -f _dispatch/kimi.log"
+            - split_direction: vertical
+              panes:
+                - cwd: "$DIR"
+                  commands:
+                    - exec: "clear; echo '=== 🩷 PTERODACTYL / GEMINI ==='; tail -n 40 -f _dispatch/gemini.log"
+                - cwd: "$DIR"
+                  commands:
+                    - exec: "clear; echo '=== 🔴 TYRANNO / CLAUDE ==='; tail -n 40 -f _dispatch/claude.log"
+YAML
+
+ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$CFG")
+echo "⚡ Power Chamber · $SLUG — apuntada a: $DIR"
+if open "warp://launch/$ENC" 2>/dev/null; then
+  echo "🦖 Abriendo la sala en Warp..."
+else
+  echo "Si no abrió sola: en Warp pulsa Cmd+P y elige '⚡ Power Chamber · $SLUG'."
+fi

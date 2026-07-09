@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# 🤖🦖 MEGAZORD — 4 Zords (CLIs de IA) se combinan en un consejo.
+#   🔴 Tyranno=Claude (líder)  ⚫ Mastodon=Codex  🔵 Triceratops=Kimi  🩷 Pterodactyl=Gemini
+#
+#   megazord                       -> 🦖 Zord roll call (estado de los 4 Zords)
+#   megazord "tu pregunta"         -> los Zords debaten y dan la directriz (no toca archivos)
+#   megazord ejecuta "tu tarea"    -> "¡Megazord, fórmate!" → se combinan y construyen
+#   megazord revisa                -> los 4 Zords revisan tu git diff
+#
+# Motor: council-dev (sobre la carpeta actual). Usa tus suscripciones, no API keys.
+set -euo pipefail
+
+if ! command -v council-dev >/dev/null 2>&1; then
+  echo "✗ No encuentro 'council-dev' (el motor de Megazord)." >&2
+  exit 1
+fi
+
+case "${1:-}" in
+  "" )
+    council-dev doctor
+    ;;
+  ejecuta|ejecutar|construye|build|formate|fórmate )
+    shift
+    council-dev execute "$*" --repo . --approve
+    ;;
+  fanout|paralelo|enjambre )
+    shift
+    council-dev execute "$*" --repo . --approve --fanout
+    ;;
+  mision|misión|tarea|trabaja|construyan )
+    shift
+    # 🦖 Misión completa: abre la sala de control + reparte y construye en paralelo, en vivo.
+    if command -v power-chamber >/dev/null 2>&1; then
+      echo "⚡ Abriendo la Power Chamber..."
+      power-chamber . >/dev/null 2>&1 &
+      sleep 1
+    fi
+    echo "🦖 ¡Megazord, fórmate! Repartiendo la misión entre los 4 Zords..."
+    council-dev execute "$*" --repo . --approve --fanout
+    ;;
+  revisa|revisar|review )
+    council-dev review --repo .
+    ;;
+  doctor|estado )
+    council-dev doctor
+    ;;
+  costo|costos|tokens|consumo )
+    council-dev costo --repo .
+    ;;
+  sesion|sesión|actas|acta )
+    shift
+    council-dev sesion --repo . "$@"
+    ;;
+  planifica|planificar|plan )
+    shift
+    # Los Zords debaten y PROPONEN el reparto (no tocan nada). El acta con el
+    # reparto llega a Telegram; se aprueba con: megazord aprueba
+    council-dev consensus "$*" --repo .
+    echo ""
+    echo "📋 Revisa el REPARTO PROPUESTO arriba (o en tu Telegram)."
+    echo "   Para ejecutarlo tal cual:  megazord aprueba"
+    ;;
+  aprueba|aprobar|aprobado|ejecuta-plan )
+    # Ejecuta el ULTIMO plan propuesto, con el reparto acordado (sin re-debatir)
+    council-dev ejecutar-plan --repo . --approve --fanout
+    ;;
+  desempeno|desempeño|stats|rendimiento )
+    council-dev desempeno --repo .
+    ;;
+  * )
+    council-dev consensus "$*" --repo .
+    ;;
+esac

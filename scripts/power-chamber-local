@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# ⚡ POWER CHAMBER (LOCAL) — 4 Zords de la Mac, en la carpeta que trabajes.
+# Uso:  power-chamber-local            (carpeta actual)
+#       power-chamber-local /ruta/proyecto
+DIR="${1:-$PWD}"
+DIR="$(cd "$DIR" 2>/dev/null && pwd)" || { echo "No existe: ${1:-$PWD}"; exit 1; }
+D="$DIR/_dispatch"
+mkdir -p "$D"; for z in claude codex kimi gemini; do touch "$D/$z.log"; done
+S="chamber-local"
+
+command -v tmux >/dev/null 2>&1 || { echo "Falta tmux:  brew install tmux"; exit 1; }
+tmux kill-session -t "$S" 2>/dev/null
+
+pane() {
+  local col="$1" name="$2" role="$3" log="$4"
+  echo "printf '\\033[1;${col}m'; \
+printf '╔══════════════════════════════════════╗\\n'; \
+printf '║  %-36s║\\n' '$name'; \
+printf '║  \\033[0;${col}m%-36s\\033[1;${col}m║\\n' '$role'; \
+printf '╚══════════════════════════════════════╝\\033[0m\\n'; \
+tail -n 40 -f '$D/$log'"
+}
+
+tmux new-session  -d -s "$S" -x "$(tput cols)" -y "$(tput lines)" "$(pane 31 '🦖 TYRANNO ZORD · Claude'      'arquitecto · nucleo · integracion' claude.log)"
+tmux split-window -h -t "$S:0.0"                                   "$(pane 90 '🐘 MASTODON ZORD · Codex'      'cirujano · refactors · tests'     codex.log)"
+tmux split-window -v -t "$S:0.0"                                   "$(pane 34 '🛡  TRICERATOPS ZORD · Kimi'    'volumen · scaffolding · Python'   kimi.log)"
+tmux split-window -v -t "$S:0.1"                                   "$(pane 35 '🦅 PTERODACTYL ZORD · Gemini'  'research · QA · docs · E2E'       gemini.log)"
+tmux select-layout -t "$S" tiled
+tmux set  -t "$S" pane-border-status top
+tmux set  -t "$S" pane-border-format ' #{pane_title} '
+tmux set  -t "$S" pane-border-style        'fg=colour238'
+tmux set  -t "$S" pane-active-border-style 'fg=colour214'
+tmux select-pane -t "$S:0.0" -T '#[fg=red,bold]🦖 TYRANNO · Claude'
+tmux select-pane -t "$S:0.1" -T '#[fg=colour245,bold]🐘 MASTODON · Codex'
+tmux select-pane -t "$S:0.2" -T '#[fg=blue,bold]🛡  TRICERATOPS · Kimi'
+tmux select-pane -t "$S:0.3" -T '#[fg=magenta,bold]🦅 PTERODACTYL · Gemini'
+tmux set  -t "$S" status-style 'bg=colour232,fg=colour214'
+tmux set  -t "$S" status-left  " ⚡ CHAMBER LOCAL · $(basename "$DIR") "
+tmux set  -t "$S" status-right '#[fg=colour245] 4 Zords · Mac '
+tmux set  -t "$S" status-left-length 40
+tmux attach -t "$S"

@@ -1,0 +1,35 @@
+{
+  "name": "megazord-cli",
+  "version": "1.0.0",
+  "description": "Convene 4 AI coding CLIs (Claude, Codex, Kimi, Gemini) as a council: they debate a task, reach consensus, and combine to build it — using your subscriptions, not API keys.",
+  "type": "module",
+  "bin": {
+    "megazord": "scripts/megazord",
+    "council-dev": "bin/council-dev.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node bin/council-dev.js selftest",
+    "doctor": "node bin/council-dev.js doctor"
+  },
+  "keywords": [
+    "ai", "cli", "coding-agent", "claude", "codex", "gemini", "kimi",
+    "multi-agent", "orchestration", "llm", "agents", "consensus", "megazord"
+  ],
+  "author": "Manuel Peña (EnPíxeles)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/megazord.git"
+  },
+  "dependencies": {}
+}

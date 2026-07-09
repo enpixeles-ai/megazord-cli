@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# 🦖🦖 MEGAZORD MULTI — lanza varias misiones (1 por proyecto) EN PARALELO,
+# cada una con su propia Power Chamber.
+#
+# Formato de cada misión:  "<ruta>::<tarea>"
+#   megazord-multi "~/Proyecto/vera::arregla el evaluador de asilo" \
+#                  "~/Proyecto/enpixeles::crea el script de backup"
+#
+# Cada misión corre en su carpeta, en background (sobrevive si cierras la
+# terminal), con su Power Chamber abierta para verla trabajar en vivo.
+set -uo pipefail
+
+if [ $# -eq 0 ]; then
+  echo "Uso: megazord-multi \"<ruta>::<tarea>\" [\"<ruta>::<tarea>\" ...]"
+  echo "Ej:  megazord-multi \"~/Proyecto/vera::arregla el login\" \"~/Proyecto/web::agrega tests\""
+  echo ""
+  echo "Ojo: cada misión usa tus suscripciones; 2-3 en paralelo va bien, muchas pueden tocar rate limits."
+  exit 1
+fi
+
+LOGDIR="$HOME/.megazord-multi-logs"
+mkdir -p "$LOGDIR"
+echo "🦖🦖 Megazord Multi — desplegando misiones en paralelo:"
+n=0
+for pair in "$@"; do
+  case "$pair" in
+    *::*) ;;
+    *) echo "  ✗ falta '::' (formato ruta::tarea): $pair" >&2; continue ;;
+  esac
+  path="${pair%%::*}"
+  task="${pair#*::}"
+  path="${path/#\~/$HOME}"          # expandir ~
+  [ -z "$task" ] && { echo "  ✗ tarea vacía: $pair" >&2; continue; }
+  abs="$(cd "$path" 2>/dev/null && pwd)" || { echo "  ✗ carpeta no existe: $path" >&2; continue; }
+  n=$((n + 1))
+  slug="$(basename "$abs")"
+  echo "  ⚡ [$n] $slug  ←  \"$task\""
+
+  # 1) abrir su Power Chamber (cada proyecto su sala)
+  command -v power-chamber >/dev/null 2>&1 && power-chamber "$abs" >/dev/null 2>&1 &
+
+  # 2) lanzar la misión en background (sobrevive al cierre de terminal vía nohup).
+  #    sh -c con args posicionales => sin inyeccion por comillas en la tarea.
+  nohup sh -c 'cd "$1" && council-dev execute "$2" --repo . --approve --fanout' _ "$abs" "$task" \
+    >"$LOGDIR/$slug.log" 2>&1 &
+  echo "       misión en marcha (PID $!) · log: $LOGDIR/$slug.log"
+done
+
+echo ""
+[ "$n" -eq 0 ] && { echo "Nada válido que lanzar."; exit 1; }
+echo "🦖 $n misión(es) corriendo, cada una con su Power Chamber abierta."
+echo "   Míralas en las salas de Warp, o sigue un log:  tail -f $LOGDIR/<proyecto>.log"
