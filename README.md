@@ -169,7 +169,8 @@ Megazord is an independent, unofficial **fan project**. It is **not affiliated w
 
 ## 📄 License
 
-MIT © 2026 Manuel Peña ([EnPíxeles](https://enpixeles.net)). See [LICENSE](LICENSE).
+- **Code:** [MIT](LICENSE) © 2026 Manuel Peña ([EnPíxeles](https://enpixeles.net)) — use it freely, keep the notice.
+- **Mascot, logo & artwork:** all rights reserved — *not* MIT. See [NOTICE.md](NOTICE.md). Build on the tool all you want; the character and brand stay ours.
 
 <div align="center">
 <br>
