@@ -14,7 +14,7 @@ import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
-const VERSION = "0.9.0";
+const VERSION = "0.11.0";
 
 // Output language of the council. Default English (public repo); set
 // MEGAZORD_LANG=es (or COUNCIL_LANG=es) for Spanish.
@@ -287,10 +287,15 @@ function trimOutput(value, max = 80_000) {
 // Cap por pieza al ENSAMBLAR prompts de critica/arbitraje: el prompt viaja como
 // UN solo argv y Linux lo limita a ~128KB (spawn E2BIG). 8 piezas x 10KB + tarea
 // deja margen seguro. El texto completo queda igual en la transcripcion.
+// Smart cap: trims the MIDDLE, never the end. In a technical proposal the closing
+// (conclusions, risks, verification criteria) is the densest part; a blind slice threw
+// it away. Keeps 60% head + 40% tail. Full text stays in the transcript.
 function capForPrompt(value, max = 10_000) {
   const text = String(value ?? "");
   if (text.length <= max) return text;
-  return `${text.slice(0, max)}\n[...recortado para el prompt; texto completo en la transcripcion...]`;
+  const head = Math.floor(max * 0.6);
+  const tail = max - head;
+  return `${text.slice(0, head)}\n[...trimmed ${text.length - max} chars from the middle; full text in the transcript...]\n${text.slice(-tail)}`;
 }
 
 function extractCodexLastMessage(stdout) {
@@ -452,7 +457,7 @@ Reglas:
   ## Workflow
   ## Analisis y riesgos
   ## Criterios de verificacion
-- Se especifico (archivos, comandos, pasos). Nada de relleno.`;
+- Se especifico (archivos, comandos, pasos). Nada de relleno.\n- ECONOMIA DE SALIDA (obligatorio): no reformules ni repitas el enunciado, no\n  expliques lo que vas a hacer antes de hacerlo, no cierres con resumenes de lo ya\n  dicho. Cero preambulo. Prosa densa. Si algo se dice en una linea, no uses tres.`;
   }
   return `You are on a technical council of four AI CLIs (Claude, Codex, Kimi, Gemini). Respond in clear, concise English.
 
@@ -468,16 +473,92 @@ Rules:
   ## Workflow
   ## Analysis and risks
   ## Verification criteria
-- Be specific (files, commands, steps). No filler.`;
+- Be specific (files, commands, steps). No filler.\n- OUTPUT ECONOMY (mandatory): do not restate the task, do not explain what you\n  are about to do before doing it, do not close with summaries of what you already\n  said. Zero preamble. Dense prose. If a point fits in one line, don't use three.`;
 }
 
-function critiquePrompt(task, proposals) {
+
+// THE PRUNER — one Zord gets this role in round 2. The other three argue about HOW
+// to build; this one asks WHETHER to build. With four models proposing in parallel
+// the bias is to over-deliver: nobody has the job of cutting.
+// Ladder distilled from Ponytail (github.com/DietrichGebert/ponytail, MIT).
+const PRUNER = (process.env.MEGAZORD_PRUNER || process.env.MEGAZORD_PODADOR || "codex").toLowerCase();
+const PRUNER_ROLE = {
+  en: `
+================== YOUR ROLE THIS ROUND: THE PRUNER ==================
+The other advisors argue about HOW to build. Your only job is to ask
+WHETHER to build. You are a lazy senior dev: lazy means efficient, not
+careless. The best code is the code never written.
+
+For each proposed piece, climb this ladder and STOP at the first rung that holds:
+  1. Does this need to be built at all? (YAGNI)
+  2. Does it already exist in this repo? Reuse the helper/pattern that's here.
+  3. Does the standard library already do this?
+  4. Does a native platform feature cover it?
+  5. Does an already-installed dependency solve it?
+  6. Can this be one line?
+  7. Only then: the minimum that works.
+
+CRITICAL — the ladder runs AFTER you understand the problem, not instead of it.
+Read the task and the code it touches, trace the real flow, then prune. A small
+change in the wrong place isn't lazy, it's a bug. NEVER prune correctness, error
+handling, tenant/data isolation, or verification.
+
+Hard rules:
+- No abstractions nobody asked for. No new dependency if avoidable.
+- Deletion over addition. Boring over clever. Fewest files possible.
+- Bug fix = root cause, not symptom: grep EVERY caller of the function you touch.
+- Question complexity: "do you actually need X, or does Y cover it?"
+
+Deliver, IN ADDITION to your improved proposal, a final section:
+  ## Pruned
+  List what is unnecessary in the other proposals, and which rung it falls on.
+======================================================================
+`,
+  es: `
+================== TU ROL EN ESTA RONDA: EL PODADOR ==================
+Los otros asesores discuten COMO construir. Tu unico trabajo es preguntar
+SI HAY QUE CONSTRUIR. Eres un senior perezoso: perezoso significa eficiente,
+no descuidado. El mejor codigo es el que nunca se escribe.
+
+Ante cada pieza propuesta, sube esta escalera y DETENTE en el primer peldano
+que aguante:
+  1. Hace falta construirlo? (YAGNI)
+  2. Ya existe en este repositorio? Reusa el helper/patron que ya esta.
+  3. Lo resuelve la libreria estandar del lenguaje?
+  4. Lo cubre una funcion nativa de la plataforma?
+  5. Lo resuelve una dependencia YA instalada?
+  6. Cabe en una linea?
+  7. Solo entonces: el minimo que funcione.
+
+CRITICO — la escalera corre DESPUES de entender el problema, no en su lugar.
+Lee la tarea y el codigo que toca, traza el flujo real, y recien ahi poda. Un
+cambio pequeno en el sitio equivocado no es pereza: es un fallo. NO recortes
+correctitud, manejo de errores, aislamiento entre clientes ni verificacion.
+
+Reglas duras:
+- Sin abstracciones que nadie pidio. Sin dependencia nueva si se puede evitar.
+- Borrar antes que anadir. Aburrido antes que ingenioso. Los menos archivos posibles.
+- Arreglo de bug = causa raiz, no sintoma: busca TODOS los llamadores.
+- Cuestiona lo complejo: "de verdad hace falta X, o Y ya lo cubre?"
+
+Entrega, ADEMAS de tu propuesta mejorada, una seccion final:
+  ## Poda
+  Lista lo que sobra de las propuestas ajenas, y por que peldano de la escalera cae.
+======================================================================
+`,
+};
+
+function critiquePrompt(task, proposals, forAgent = null) {
   const label = LANG === "es" ? "Propuesta" : "Proposal";
   const empty = LANG === "es" ? "[sin salida]" : "[no output]";
   const others = proposals.map((p, i) => `### ${label} ${i + 1}\n${capForPrompt(p.text || p.stderr || empty)}`).join("\n\n");
+  // Only ONE Zord gets the role: if all four had it they would all converge on
+  // minimalism and the disagreement — where the good decision comes from — is lost.
+  const role = forAgent === PRUNER ? PRUNER_ROLE[LANG] : "";
   if (LANG === "es") {
     return `${basePrompt(task)}
 
+${role}
 PROPUESTAS DE LOS OTROS ASESORES (anonimas):
 ${others}
 
@@ -485,6 +566,7 @@ Ahora: 1) critica fallos, supuestos fragiles y riesgos de las otras propuestas; 
   }
   return `${basePrompt(task)}
 
+${role}
 THE OTHER ADVISORS' PROPOSALS (anonymized):
 ${others}
 
@@ -500,6 +582,19 @@ function arbiterPrompt(task, firstRound, critiques) {
 
   if (LANG === "es") {
     return `Eres el Arquitecto Principal (Claude) y tienes la ultima palabra tecnica. Espanol neutro (tuteo, sin voseo). Recibiste la tarea y las propuestas refinadas del consejo. Sintetiza UNA directriz unica y accionable. No promedies: elige lo mejor de cada propuesta y justifica breve.
+
+REGLA DE LA PODA (no negociable): una de las criticas trae una seccion "## Poda".
+Esa seccion NO es una opinion mas que promedias con las otras tres — es un veto por
+defecto. Procesala ANTES de armar el plan, punto por punto:
+- Cada elemento podado queda FUERA del plan, salvo que escribas por que es
+  imprescindible. La carga de la prueba la tiene quien quiere CONSTRUIR, no quien
+  quiere recortar. Tres asesores diciendo "construyamos esto" no derrotan una poda.
+- Solo puedes rescatar algo podado si es correctitud, manejo de errores, aislamiento
+  entre clientes/datos, o verificacion. Comodidad, "por si acaso", "buenas practicas"
+  y "escalabilidad futura" NO son motivos validos.
+- Si rescatas algo, dilo explicitamente: "Rescato X porque <motivo>".
+- Menos pasos y menos archivos es MEJOR resultado, no peor.
+
 
 TAREA ORIGINAL:
 ${task}
@@ -548,6 +643,19 @@ Cada "instruccion" debe ser autocontenida (el CLI asignado solo recibe ese texto
   }
 
   return `You are the Principal Architect (Claude) with the final technical say. Respond in clear English. You received the task and the council's refined proposals. Synthesize ONE single, actionable directive. Don't average: pick the best of each proposal and justify briefly.
+
+PRUNING RULE (non-negotiable): one of the critiques carries a "## Pruned" section.
+That section is NOT just another opinion to average with the other three — it is a
+veto by default. Process it BEFORE assembling the plan, item by item:
+- Every pruned item stays OUT of the plan unless you write why it is indispensable.
+  The burden of proof is on whoever wants to BUILD, not on whoever wants to cut.
+  Three advisors saying "let's build this" do not defeat a prune: all three are
+  builders and that is exactly their bias.
+- You may only rescue a pruned item if it is correctness, error handling,
+  tenant/data isolation, or verification. Convenience, "just in case", "best
+  practices" and "future scalability" are NOT valid reasons.
+- If you rescue something, say so in one line: "Rescuing X because <reason>".
+- Fewer steps and fewer files is a BETTER result, not a worse one.
 
 ORIGINAL TASK:
 ${task}
@@ -730,13 +838,13 @@ async function firstRound(task, repo, options) {
 }
 
 async function critiqueRound(task, repo, proposals, options) {
-  const prompt = critiquePrompt(task, proposals);
+  const p = (agent) => critiquePrompt(task, proposals, agent);
   const L = "🧠 critica ronda 2";
   return Promise.all([
-    adapters.claudePlan(prompt, repo, dlog(repo, "claude", L, options)),
-    adapters.kimiPlan(prompt, repo, dlog(repo, "kimi", L, options)),
-    adapters.codexPlan(prompt, repo, dlog(repo, "codex", L, options)),
-    adapters.geminiPlan(prompt, repo, dlog(repo, "gemini", L, options)),
+    adapters.claudePlan(p("claude"), repo, dlog(repo, "claude", L, options)),
+    adapters.kimiPlan(p("kimi"), repo, dlog(repo, "kimi", L, options)),
+    adapters.codexPlan(p("codex"), repo, dlog(repo, "codex", L, options)),
+    adapters.geminiPlan(p("gemini"), repo, dlog(repo, "gemini", L, options)),
   ]);
 }
 

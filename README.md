@@ -145,6 +145,47 @@ Under the hood everything is the `council-dev` engine — `megazord` is a friend
 - **`megazord-chamber`** — a live 2×2 "Power Chamber" that shows each Zord working in its own pane.
 - **`megazord-iniciate`** — a cinematic ASCII intro animation of the Zords forming up. A fun splash screen for demos and streams.
 
+
+## 🪚 The Pruner
+
+Four models proposing in parallel share one bias: **they all want to deliver more.**
+Nobody in the room has the job of asking *"do we even need this?"* — so nobody does.
+
+Megazord gives that job to one Zord in the critique round. It climbs a ladder and
+stops at the first rung that holds:
+
+```
+1. Does this need to be built at all?      (YAGNI)
+2. Does it already exist in this repo?
+3. Does the standard library do it?
+4. Does a native platform feature cover it?
+5. Does an already-installed dependency solve it?
+6. Can this be one line?
+7. Only then: the minimum that works.
+```
+
+**The other half matters more:** the arbiter cannot ignore the pruning. Every pruned
+item stays out of the plan **unless the arbiter writes why it's indispensable** — and
+only correctness, error handling, tenant isolation and verification qualify. The
+burden of proof sits with whoever wants to build.
+
+Measured on the same task, three runs:
+
+| | Steps | Files |
+|---|---|---|
+| No pruner | 9 | 13 |
+| Pruner, arbiter free to ignore it | 10 | 12 |
+| **Pruner + arbiter bound by it** | **4** | **5** |
+
+The role alone did nothing. **Binding the arbiter is what moved the numbers.**
+
+Ladder distilled from [Ponytail](https://github.com/DietrichGebert/ponytail) (MIT).
+
+```bash
+MEGAZORD_PRUNER=kimi     # change who prunes (default: codex)
+MEGAZORD_PRUNER=none     # turn it off
+```
+
 ## ❓ FAQ
 
 **Do I need all four CLIs?** No. Two is enough. Claude is the referee, so it's recommended, but Megazord adapts to whoever's online.

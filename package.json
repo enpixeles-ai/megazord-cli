@@ -1,6 +1,6 @@
 {
   "name": "megazord-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Convene 4 AI coding CLIs (Claude, Codex, Kimi, Gemini) as a council: they debate a task, reach consensus, and combine to build it — using your subscriptions, not API keys.",
   "type": "module",
   "bin": {

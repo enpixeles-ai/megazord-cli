@@ -22,3 +22,4 @@ mascot-anim.mp4
 assets/demo-real.cast
 assets/demo-rollcall.cast
 assets/power-greenscreen.gif
+bin/*.bak-*
