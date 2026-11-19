@@ -89,7 +89,7 @@ export TELEGRAM_CHAT_ID=987654321           # your chat id
 ## Optional: watch them work live
 
 ```bash
-megazord-chamber          # simulated 2x2 (great for a quick demo)
+megazord-chamber          # simulated 3x2, six panes (great for a quick demo)
 ```
 
 For a real remote server, copy `scripts/power-chamber-vps.template`, set your host, and run it.

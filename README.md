@@ -161,7 +161,7 @@ Under the hood everything is the `council-dev` engine — `megazord` is a friend
 
 ## 🎬 Extras
 
-- **`megazord-chamber`** — a live 2×2 "Power Chamber" that shows each Zord working in its own pane.
+- **`megazord-chamber`** — a live 3×2 "Power Chamber" that shows each Zord working in its own pane.
 - **`megazord-iniciate`** — a cinematic ASCII intro animation of the Zords forming up. A fun splash screen for demos and streams.
 
 

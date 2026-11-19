@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# ⚡ POWER CHAMBER — abre la sala de control 2x2 de Warp con los 4 Zords,
+# ⚡ POWER CHAMBER — abre la sala de control de Warp (3 columnas x 2 filas) con los 6 Zords,
 # apuntada a la carpeta que le digas (o la actual).
 #
 #   power-chamber              -> sala apuntada a la carpeta actual
 #   power-chamber /ruta/proyecto   -> apuntada a esa carpeta
 #
 # Cada panel hace tail -f de _dispatch/<zord>.log (se llenan cuando los Zords
-# trabajan en esa tarea). El 4º panel muestra los commits en vivo.
+# trabajan en esa tarea).
 set -euo pipefail
 
 DIR="${1:-$PWD}"
@@ -17,14 +17,14 @@ SLUG="$(basename "$DIR" | tr ' ' '-' | tr -cd '[:alnum:]._-')"
 CFGDIR="$HOME/.warp/launch_configurations"
 CFG="$CFGDIR/power-chamber-$SLUG.yaml"
 mkdir -p "$CFGDIR" "$DIR/_dispatch"
-for z in codex kimi gemini claude; do touch "$DIR/_dispatch/$z.log" 2>/dev/null || true; done
+for z in claude codex kimi gemini zai deepseek; do touch "$DIR/_dispatch/$z.log" 2>/dev/null || true; done
 
 cat > "$CFG" <<YAML
 ---
 name: "⚡ Power Chamber · $SLUG"
 windows:
   - tabs:
-      - title: "⚡ $SLUG — 4 Zords"
+      - title: "⚡ $SLUG — 6 Zords"
         layout:
           split_direction: horizontal
           panes:
@@ -32,18 +32,26 @@ windows:
               panes:
                 - cwd: "$DIR"
                   commands:
-                    - exec: "clear; echo '=== ⚫ MASTODON / CODEX ==='; tail -n 40 -f _dispatch/codex.log"
+                    - exec: "clear; echo '=== 🔴 TYRANNO / CLAUDE ==='; tail -n 40 -f _dispatch/claude.log"
                 - cwd: "$DIR"
                   commands:
-                    - exec: "clear; echo '=== 🔵 TRICERATOPS / KIMI ==='; tail -n 40 -f _dispatch/kimi.log"
+                    - exec: "clear; echo '=== ⚫ MASTODON / CODEX ==='; tail -n 40 -f _dispatch/codex.log"
             - split_direction: vertical
               panes:
                 - cwd: "$DIR"
                   commands:
-                    - exec: "clear; echo '=== 🩷 PTERODACTYL / GEMINI ==='; tail -n 40 -f _dispatch/gemini.log"
+                    - exec: "clear; echo '=== 🔵 TRICERATOPS / KIMI ==='; tail -n 40 -f _dispatch/kimi.log"
                 - cwd: "$DIR"
                   commands:
-                    - exec: "clear; echo '=== 🔴 TYRANNO / CLAUDE ==='; tail -n 40 -f _dispatch/claude.log"
+                    - exec: "clear; echo '=== 🩷 PTERODACTYL / ANTIGRAVITY ==='; tail -n 40 -f _dispatch/gemini.log"
+            - split_direction: vertical
+              panes:
+                - cwd: "$DIR"
+                  commands:
+                    - exec: "clear; echo '=== 🟡 SABERDIENTE / ZCODE ==='; tail -n 40 -f _dispatch/zai.log"
+                - cwd: "$DIR"
+                  commands:
+                    - exec: "clear; echo '=== 🩵 DRAGONZORD / DEEPSEEK ==='; tail -n 40 -f _dispatch/deepseek.log"
 YAML
 
 ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$CFG")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ⚡ POWER CHAMBER (remoto/SSH) — plantilla.
-# Vigila los 4 Zords trabajando en un servidor remoto, en rejilla 2x2.
+# Vigila los 6 Zords trabajando en un servidor remoto, en rejilla 3x2.
 #
 # CÓMO USAR:
 #   1. Copia este archivo a ~/.local/bin/power-chamber-vps  (sin el .template)
@@ -25,10 +25,16 @@ printf '╚═══════════════════════
 tail -n 40 -f $DIR/$4\""
 }
 
-tmux new-session  -d -s "$S" -x "$(tput cols)" -y "$(tput lines)" "$(pane 31 '🦖 TYRANNO · Claude'      'arquitecto · integracion' claude.log)"
-tmux split-window -h -t "$S:0.0"                                   "$(pane 90 '🐘 MASTODON · Codex'      'refactors · tests'        codex.log)"
-tmux split-window -v -t "$S:0.0"                                   "$(pane 34 '🛡  TRICERATOPS · Kimi'    'volumen · scaffolding'    kimi.log)"
-tmux split-window -v -t "$S:0.1"                                   "$(pane 35 '🦅 PTERODACTYL · Gemini'  'research · QA · docs'     gemini.log)"
+tmux new-session  -d -s "$S" -x "$(tput cols)" -y "$(tput lines)" "$(pane 31 '🦖 TYRANNO · Claude' 'arquitecto · integracion' claude.log)"
+for z in "90|🐘 MASTODON · Codex|refactors · tests|codex.log" \
+         "34|🛡  TRICERATOPS · Kimi|volumen · scaffolding|kimi.log" \
+         "35|🦅 PTERODACTYL · Antigravity|research · QA · docs|gemini.log" \
+         "33|🐯 SABERDIENTE · ZCode|contrapunto · pasos acotados|zai.log" \
+         "36|🐉 DRAGONZORD · DeepSeek|voz extra · ediciones aisladas|deepseek.log"; do
+  IFS='|' read -r col name role log <<<"$z"
+  tmux split-window -t "$S:0" "$(pane "$col" "$name" "$role" "$log")"
+  tmux select-layout -t "$S" tiled >/dev/null
+done
 tmux select-layout -t "$S" tiled
 tmux set -t "$S" pane-border-status top
 tmux attach -t "$S"

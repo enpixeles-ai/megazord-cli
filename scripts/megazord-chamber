@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# 🎬 POWER CHAMBER SIMULADA — 2x2, los 4 Zords escribiendo codigo en vivo.
+# 🎬 POWER CHAMBER SIMULADA — 3x2, los 6 Zords escribiendo codigo en vivo.
 # Puro show para grabar reels. No ejecuta nada real, no gasta tokens.
-import os, sys, time, random, shutil
+import os, sys, time, random, shutil, unicodedata
 
 R="\033[1;31m"; K="\033[1;90m"; B="\033[1;34m"; P="\033[1;35m"
-G="\033[1;32m"; Y="\033[1;33m"; W="\033[1;97m"; D="\033[2m"; N="\033[0m"
+G="\033[1;32m"; Y="\033[1;33m"; C="\033[1;36m"; W="\033[1;97m"; D="\033[2m"; N="\033[0m"
 
 CH = 9  # lineas de contenido por panel (fijo → nunca se desborda)
 
@@ -15,16 +15,24 @@ ZORDS=[
   "code":["describe('dedup',()=>{","  it('bloquea dup',()=>{","    expect(isDup(k)).ok;","  });","  it('email pasa',()=>{","    expect(guard(m)).no;","✔ 21 passing (0.16s)","refactor · quirurgico"]},
  {"name":"🛡  TRICERATOPS · Kimi","col":B,"file":"lane_scheduler.py",
   "code":["def run_lanes(q, fn):","  for it in enrich(q):","    lane = detect(it)","    await wait_for(lane)","  # backoff decide","  log({'ok': True})","✔ modulo nuevo · 213 ln","scaffolding completo"]},
- {"name":"🦅 PTERODACTYL · Gemini","col":P,"file":"e2e.spec.ts",
+ {"name":"🦅 PTERODACTYL · Antigravity","col":P,"file":"e2e.spec.ts",
   "code":["test('cross-tenant',()=>{","  await loginAs(B);","  const r = openCase(A);","  expect(r.code).is(403);","  // QA: 4 vectores","  await rateLimit();","✔ E2E verde · 4/4","docs actualizados"]},
+ {"name":"🐯 SABERDIENTE · ZCode","col":Y,"file":"review.md",
+  "code":["## Contrapunto","- ¿hace falta la cola?","- un cron basta hoy","  // menos piezas","- quitar 2 dependencias","  aplicado: -84 lineas","✔ mas simple · mismo efecto","paso acotado listo"]},
+ {"name":"🐉 DRAGONZORD · DeepSeek","col":C,"file":"utils/dates.ts",
+  "code":["export function toLocal(d,tz){","  if(!tz) return utc(d);","  return shift(d, tz);","}","// zona horaria del cliente","test('tz caracas')","✔ 6/6 · edicion aislada","sin tocar fuera"]},
 ]
+
+def ancho(texto):
+    # Los emojis ocupan 2 columnas en la terminal aunque len() cuente 1.
+    return sum(2 if unicodedata.east_asian_width(ch) in "WF" else 0 if unicodedata.combining(ch) or ch == "\ufe0f" else 1 for ch in texto)
 
 def render(pos, pw, body, counter):
     buf=[]
     for i,z in enumerate(ZORDS):
         r,c = pos[i]
         head = f" {z['name']} "
-        buf.append(f"\033[{r};{c}H{z['col']}┌{head}{'─'*max(0,pw-len(head)-3)}┐{N}")
+        buf.append(f"\033[{r};{c}H{z['col']}┌{head}{'─'*max(0,pw-ancho(head)-3)}┐{N}")
         buf.append(f"\033[{r+1};{c}H\033[K{D}{z['col']}│{N} {D}~/{z['file']}{N}")
         for k in range(CH):
             line = body[i][k] if k < len(body[i]) else ""
@@ -34,24 +42,24 @@ def render(pos, pw, body, counter):
 def main():
     dur = float(os.environ.get("MZ_SECONDS","26"))
     size = shutil.get_terminal_size((110,30))
-    COLS = max(60, size.columns)
-    pw = COLS//2
+    COLS = max(90, size.columns)
+    pw = (COLS-2)//3
     maxw = pw - 5
     PH = CH + 2                       # alto de cada panel (header + contenido)
-    pos = [(2,1),(2,pw+2),(2+PH,1),(2+PH,pw+2)]
+    pos = [(2+PH*f, 1+(pw+1)*c) for f in range(2) for c in range(3)]
     banner_row = 2 + 2*PH
-    body = [[] for _ in range(4)]
-    counter = [0,0,0,0]
+    body = [[] for _ in ZORDS]
+    counter = [0 for _ in ZORDS]
 
     sys.stdout.write("\033[?25l\033[2J\033[H")
-    title = "⚡  P O W E R   C H A M B E R  —  4 ZORDS EN LINEA  ⚡"
+    title = "⚡  P O W E R   C H A M B E R  —  6 ZORDS EN LINEA  ⚡"
     sys.stdout.write(f"\033[1;{max(1,(COLS-len(title))//2)}H{Y}{title}{N}")
     sys.stdout.flush()
 
     bag=[]; start=time.time()
     while time.time()-start < dur:
         if not bag:
-            bag=[0,1,2,3]; random.shuffle(bag)
+            bag=list(range(len(ZORDS))); random.shuffle(bag)
         i = bag.pop()
         z = ZORDS[i]; counter[i]+=1
         raw = z["code"][(counter[i]-1) % len(z["code"])][:maxw]
@@ -59,7 +67,7 @@ def main():
         color = G if ok else z["col"]
         body[i].append(f"{D}{counter[i]:>2}{N} {color}{raw}{N}")
         if len(body[i])>CH: body[i].pop(0)
-        render(pos, pw, body, counter)          # redibuja LOS 4 → simetrico
+        render(pos, pw, body, counter)          # redibuja LOS 6 → simetrico
         time.sleep(random.uniform(0.16,0.34))
 
     banner = f"{G}✔ MISION COMPLETADA · tests verdes · 0 errores · acta → Telegram{N}"

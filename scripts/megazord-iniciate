@@ -29,7 +29,9 @@ echo; sleep 0.6
 printf "${R}🦖 TYRANNO ZORD${N}    ${D}(Claude · arquitecto)${N}"; sleep 0.8; printf "  ${G}✔ EN LÍNEA${N}\n"
 printf "${K}🐘 MASTODON ZORD${N}   ${D}(Codex · cirujano)${N}  "; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
 printf "${B}🛡  TRICERATOPS ZORD${N} ${D}(Kimi · volumen)${N}   "; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
-printf "${P}🦅 PTERODACTYL ZORD${N} ${D}(Gemini · visión)${N}  "; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
+printf "${P}🦅 PTERODACTYL ZORD${N} ${D}(Antigravity · visión)${N}"; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
+printf "${Y}🐯 SABERDIENTE ZORD${N} ${D}(ZCode · contrapunto)${N}"; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
+printf "${C}🐉 DRAGONZORD${N}       ${D}(DeepSeek · voz extra)${N}"; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
 echo; sleep 0.8
 
 type_out "$(printf "${Y}🧠 FASE 1 — Los Zords analizan la misión...${N}")"
@@ -37,7 +39,9 @@ sleep 0.4
 printf "${R}  Tyranno:${N} ${D}leyendo el código fuente... 680 líneas escaneadas${N}\n"; sleep 0.6
 printf "${B}  Triceratops:${N} ${D}detecté el bug en la línea 219 — la agenda pierde el estado${N}\n"; sleep 0.7
 printf "${K}  Mastodon:${N} ${D}propongo refactor quirúrgico + test de regresión${N}\n"; sleep 0.7
-printf "${P}  Pterodactyl:${N} ${D}objeción: falta validar la zona horaria del cliente${N}\n"; sleep 0.9
+printf "${P}  Pterodactyl:${N} ${D}objeción: falta validar la zona horaria del cliente${N}\n"; sleep 0.7
+printf "${Y}  Saberdiente:${N} ${D}contrapunto: sobra la cola nueva, un cron basta${N}\n"; sleep 0.7
+printf "${C}  Dragonzord:${N} ${D}me encargo de la función de fechas, aislada${N}\n"; sleep 0.9
 echo
 
 type_out "$(printf "${Y}⚔️  FASE 2 — Debate cruzado (cada Zord ataca las propuestas del resto)...${N}")"
@@ -52,7 +56,9 @@ sleep 0.4
 printf "  ${R}Tyranno${N}     → núcleo crítico\n"; sleep 0.35
 printf "  ${K}Mastodon${N}    → refactor + tests\n"; sleep 0.35
 printf "  ${B}Triceratops${N} → módulo nuevo\n"; sleep 0.35
-printf "  ${P}Pterodactyl${N} → QA + documentación\n"
+printf "  ${P}Pterodactyl${N} → QA + documentación\n"; sleep 0.35
+printf "  ${Y}Saberdiente${N} → recorte de piezas\n"; sleep 0.35
+printf "  ${C}Dragonzord${N}  → fechas y zona horaria\n"
 echo; sleep 0.8
 
 type_out "$(printf "${G}🔧 FASE 3 — ¡MEGAZORD, FÓRMATE! Construcción en paralelo:${N}")"
@@ -61,6 +67,8 @@ bar "🦖 Tyranno"     "$R"
 bar "🐘 Mastodon"    "$K"
 bar "🛡  Triceratops" "$B"
 bar "🦅 Pterodactyl"  "$P"
+bar "🐯 Saberdiente"  "$Y"
+bar "🐉 Dragonzord"   "$C"
 echo; sleep 0.5
 
 printf "${D}  ✔ verify: tests........................${N} ${G}PASSED (21/21)${N}\n"; sleep 0.4
@@ -77,7 +85,7 @@ cat <<'A'
    ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚══════╝╚══════╝   ╚═╝    ╚═════╝
 A
 printf "${N}"
-printf "${W}  🦖 Misión completada · acta enviada a Telegram · 4 IAs, 0 drama${N}\n"
+printf "${W}  🦖 Misión completada · acta enviada a Telegram · 6 IAs, 0 drama${N}\n"
 printf "${D}     EnPíxeles · agentes de IA que trabajan por ti${N}\n\n"
 sleep 0.6
 printf "${Y}  ═══════════════════════════════════════════════════${N}\n"
@@ -88,7 +96,7 @@ type_out "$(printf "${R}      Megazord${W} proteja tu misión!\"${N}")"
 sleep 0.4
 printf "${G}\n              ¡GO GO MEGAZORD! 🦖⚡${N}\n\n"
 
-# ── Encadena la Power Chamber simulada (los 4 Zords escribiendo código) ──
+# ── Encadena la Power Chamber simulada (los 6 Zords escribiendo código) ──
 if command -v megazord-chamber >/dev/null 2>&1; then
   sleep 1.2
   megazord-chamber

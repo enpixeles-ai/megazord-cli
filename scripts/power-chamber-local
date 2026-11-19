@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
-# ⚡ POWER CHAMBER (LOCAL) — 4 Zords de la Mac, en la carpeta que trabajes.
+# ⚡ POWER CHAMBER (LOCAL) — los 6 Zords de la Mac en rejilla 3x2, en la carpeta que trabajes.
 # Uso:  power-chamber-local            (carpeta actual)
 #       power-chamber-local /ruta/proyecto
 DIR="${1:-$PWD}"
 DIR="$(cd "$DIR" 2>/dev/null && pwd)" || { echo "No existe: ${1:-$PWD}"; exit 1; }
 D="$DIR/_dispatch"
-mkdir -p "$D"; for z in claude codex kimi gemini; do touch "$D/$z.log"; done
 S="chamber-local"
 
 command -v tmux >/dev/null 2>&1 || { echo "Falta tmux:  brew install tmux"; exit 1; }
-tmux kill-session -t "$S" 2>/dev/null
+
+# color ANSI | color tmux | nombre | rol | log (el motor escribe _dispatch/<agente>.log)
+ZORDS=(
+  "31|red|🦖 TYRANNO ZORD · Claude|arquitecto · nucleo · integracion|claude"
+  "90|colour245|🐘 MASTODON ZORD · Codex|cirujano · refactors · tests|codex"
+  "34|blue|🛡  TRICERATOPS ZORD · Kimi|volumen · scaffolding · Python|kimi"
+  "35|magenta|🦅 PTERODACTYL ZORD · Antigravity|research · QA · docs · E2E|gemini"
+  "33|yellow|🐯 SABERDIENTE ZORD · ZCode|contrapunto · pasos acotados|zai"
+  "36|cyan|🐉 DRAGONZORD · DeepSeek|voz extra · ediciones aisladas|deepseek"
+)
 
 pane() {
   local col="$1" name="$2" role="$3" log="$4"
@@ -18,24 +26,33 @@ printf '╔═══════════════════════
 printf '║  %-36s║\\n' '$name'; \
 printf '║  \\033[0;${col}m%-36s\\033[1;${col}m║\\n' '$role'; \
 printf '╚══════════════════════════════════════╝\\033[0m\\n'; \
-tail -n 40 -f '$D/$log'"
+tail -n 40 -f '$D/$log.log'"
 }
 
-tmux new-session  -d -s "$S" -x "$(tput cols)" -y "$(tput lines)" "$(pane 31 '🦖 TYRANNO ZORD · Claude'      'arquitecto · nucleo · integracion' claude.log)"
-tmux split-window -h -t "$S:0.0"                                   "$(pane 90 '🐘 MASTODON ZORD · Codex'      'cirujano · refactors · tests'     codex.log)"
-tmux split-window -v -t "$S:0.0"                                   "$(pane 34 '🛡  TRICERATOPS ZORD · Kimi'    'volumen · scaffolding · Python'   kimi.log)"
-tmux split-window -v -t "$S:0.1"                                   "$(pane 35 '🦅 PTERODACTYL ZORD · Gemini'  'research · QA · docs · E2E'       gemini.log)"
-tmux select-layout -t "$S" tiled
+mkdir -p "$D"
+tmux kill-session -t "$S" 2>/dev/null
+TOP=()   # fila de arriba: 3 columnas; la de abajo se parte debajo de cada una
+for i in "${!ZORDS[@]}"; do
+  IFS='|' read -r col tcol name role log <<<"${ZORDS[$i]}"
+  touch "$D/$log.log"
+  cmd="$(pane "$col" "$name" "$role" "$log")"
+  if [ "$i" -eq 0 ]; then
+    id=$(tmux new-session -d -P -F '#{pane_id}' -s "$S" -x "$(tput cols)" -y "$(tput lines)" "$cmd")
+  elif [ "$i" -lt 3 ]; then
+    id=$(tmux split-window -h -P -F '#{pane_id}' -t "${TOP[$((i-1))]}" "$cmd")
+    tmux select-layout -t "$S" even-horizontal >/dev/null
+  else
+    id=$(tmux split-window -v -P -F '#{pane_id}' -t "${TOP[$((i-3))]}" "$cmd")
+  fi
+  [ "$i" -lt 3 ] && TOP+=("$id")
+  tmux select-pane -t "$id" -T "#[fg=$tcol,bold]${name/ ZORD/}"
+done
 tmux set  -t "$S" pane-border-status top
 tmux set  -t "$S" pane-border-format ' #{pane_title} '
 tmux set  -t "$S" pane-border-style        'fg=colour238'
 tmux set  -t "$S" pane-active-border-style 'fg=colour214'
-tmux select-pane -t "$S:0.0" -T '#[fg=red,bold]🦖 TYRANNO · Claude'
-tmux select-pane -t "$S:0.1" -T '#[fg=colour245,bold]🐘 MASTODON · Codex'
-tmux select-pane -t "$S:0.2" -T '#[fg=blue,bold]🛡  TRICERATOPS · Kimi'
-tmux select-pane -t "$S:0.3" -T '#[fg=magenta,bold]🦅 PTERODACTYL · Gemini'
 tmux set  -t "$S" status-style 'bg=colour232,fg=colour214'
 tmux set  -t "$S" status-left  " ⚡ CHAMBER LOCAL · $(basename "$DIR") "
-tmux set  -t "$S" status-right '#[fg=colour245] 4 Zords · Mac '
+tmux set  -t "$S" status-right '#[fg=colour245] 6 Zords · Mac '
 tmux set  -t "$S" status-left-length 40
 tmux attach -t "$S"
