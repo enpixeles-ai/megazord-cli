@@ -32,7 +32,7 @@ printf "${B}🛡  TRICERATOPS ZORD${N} ${D}(Kimi · volumen)${N}   "; sleep 0.7;
 printf "${P}🦅 PTERODACTYL ZORD${N} ${D}(Gemini · visión)${N}  "; sleep 0.7; printf "  ${G}✔ EN LÍNEA${N}\n"
 echo; sleep 0.8
 
-type_out "$(printf "${Y}🧠 FASE 1 — Los 4 Zords analizan la misión...${N}")"
+type_out "$(printf "${Y}🧠 FASE 1 — Los Zords analizan la misión...${N}")"
 sleep 0.4
 printf "${R}  Tyranno:${N} ${D}leyendo el código fuente... 680 líneas escaneadas${N}\n"; sleep 0.6
 printf "${B}  Triceratops:${N} ${D}detecté el bug en la línea 219 — la agenda pierde el estado${N}\n"; sleep 0.7

@@ -1,7 +1,7 @@
 {
   "name": "megazord-cli",
   "version": "1.2.0",
-  "description": "Convene up to six AI coding assistants (Claude, Codex, Kimi, Gemini, GLM and DeepSeek) to debate, review and build.",
+  "description": "Convene up to six AI coding assistants (Claude Code, Codex, Kimi, Google Antigravity, Z.AI ZCode and DeepSeek via OpenCode) to debate, review and build.",
   "type": "module",
   "bin": {
     "megazord": "scripts/megazord",

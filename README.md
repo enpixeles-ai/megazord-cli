@@ -2,7 +2,7 @@
 
 <img src="assets/power-hero.gif" alt="Megazord CLI mascot powering up" width="300">
 
-<img src="assets/banner.svg" alt="Megazord CLI — four AI coding CLIs, one council" width="100%">
+<img src="assets/banner.svg" alt="Megazord CLI — six AI coding CLIs, one council" width="100%">
 
 <br><br>
 
@@ -32,7 +32,7 @@ megazord mission "add rate limiting to the login endpoint"             # debate 
 <div align="center">
 
 <!-- 👉 Replace with your GIF: record with `asciinema rec demo.cast -c megazord-iniciate` then `agg demo.cast assets/demo.gif` -->
-<img src="assets/demo.gif" alt="Megazord in action — the four Zords form up and build in parallel" width="80%">
+<img src="assets/demo.gif" alt="Megazord in action — the Zords form up and build in parallel" width="80%">
 
 <i>A stylized intro animation of the flow: the Zords assemble, debate, split the work by strength, and build.</i>
 
@@ -42,9 +42,9 @@ megazord mission "add rate limiting to the login endpoint"             # debate 
 
 ## Why
 
-One AI is one opinion. Ask up to six strong models the same coding question and you get something better than any of them alone: a **debate**. One catches the bug another missed. One over-engineers, another simplifies. A referee (Claude, the architect) synthesizes the best of each into a single plan — then the four **build it in parallel**, each doing what it's best at.
+One AI is one opinion. Ask up to six strong models the same coding question and you get something better than any of them alone: a **debate**. One catches the bug another missed. One over-engineers, another simplifies. A referee (Claude, the architect) synthesizes the best of each into a single plan — then the Zords **build it in parallel**, each doing what it's best at.
 
-Most multi-agent tools bill you per token through APIs. **Megazord shells out to the CLIs you're already logged into** (Claude Code, Codex CLI, Kimi CLI, Gemini CLI). If you pay flat monthly subscriptions, your marginal cost per council is effectively **$0**.
+Most multi-agent tools bill you per token through APIs. **Megazord shells out to the CLIs you're already logged into** (Claude Code, Codex, Kimi Code, Google Antigravity, Z.AI's ZCode Coding Plan and OpenCode). If you pay flat monthly subscriptions, your marginal cost per council is effectively **$0**.
 
 ## The Zords
 
@@ -53,11 +53,11 @@ Most multi-agent tools bill you per token through APIs. **Megazord shells out to
 | 🦖 **Tyranno** | Claude | Architect & referee — synthesizes the directive, owns critical/production code, final integration |
 | 🐘 **Mastodon** | Codex | Surgical editor — precise refactors, tests, single-file fixes |
 | 🛡️ **Triceratops** | Kimi | Workhorse — volume, scaffolding, new files, migrations |
-| 🦅 **Pterodactyl** | Antigravity or Gemini CLI | Recon — research, QA, docs, end-to-end tests |
-| Saberdiente | Z.AI Coding Plan | GLM debate, optionally builds via a configured CLI |
-| Dragonzord | DeepSeek via OpenCode | Isolated read-only debate and approved edits |
+| 🦅 **Pterodactyl** | Google Antigravity (`agy`) · Gemini CLI as fallback | Recon — research, QA, docs, end-to-end tests |
+| 🐯 **Saberdiente** | Z.AI ZCode Coding Plan (GLM) | Contrarian voice — debates and, with a configured CLI, builds bounded steps |
+| 🐉 **Dragonzord** | DeepSeek via OpenCode | Free extra voice — read-only debate, isolated edits when building |
 
-All six are optional. A council needs two responding voices. Run `megazord doctor` for local detection or `megazord doctor --vivo` to send a real request to each available provider. Chimerazord reviews the current tracked diff with the available specialties.
+All six are optional. A council needs two responding voices. Run `megazord doctor` for local detection or `megazord doctor --vivo` to send a real request to each available provider. **Chimerazord** turns the available Zords into six simulated attackers (AppSec, prompt injection, secrets, business logic, systemic failures, privacy) on your own repo, read only, and a CISO consolidates one prioritized report.
 
 | Optional environment variable | Purpose |
 |---|---|
@@ -82,10 +82,12 @@ Megazord orchestrates existing CLIs — install and log into the ones you have:
 npm i -g @anthropic-ai/claude-code   # 🦖 Claude  (optional referee)
 npm i -g @openai/codex               # 🐘 Codex   (optional)
 npm i -g @moonshot-ai/kimi-code      # 🛡️ Kimi    (optional)
-npm i -g @google/gemini-cli          # 🦅 Gemini  (optional)
+# 🦅 Antigravity: install Google Antigravity and sign in; it provides the `agy` CLI (optional)
+npm i -g @google/gemini-cli          # 🦅 fallback if you don't use Antigravity (optional)
+npm i -g opencode-ai                 # 🐉 DeepSeek via OpenCode (optional, free models)
 ```
 
-Then log into each one once (`claude`, `codex`, `kimi login`, `gemini`). Megazord works with **as few as 2** — it adapts to whoever is available.
+Then log into each one once (`claude`, `codex`, `kimi login`, `agy`). For Saberdiente set `ZAI_API_KEY` or sign in to the ZCode app. Megazord works with **as few as 2** — it adapts to whoever is available.
 
 ### 2. Install Megazord
 
@@ -101,7 +103,7 @@ git clone https://github.com/enpixeles-ai/megazord-cli && cd megazord-cli && ./i
 megazord            # 🦖 roll call — shows which Zords are online
 ```
 
-<div align="center"><img src="assets/rollcall.gif" alt="megazord roll call — the four Zords online" width="70%"></div>
+<div align="center"><img src="assets/rollcall.gif" alt="megazord roll call — the Zords online" width="70%"></div>
 
 ### 4. Use it
 
@@ -165,7 +167,7 @@ Under the hood everything is the `council-dev` engine — `megazord` is a friend
 
 ## 🪚 The Pruner
 
-Four models proposing in parallel share one bias: **they all want to deliver more.**
+Several models proposing in parallel share one bias: **they all want to deliver more.**
 Nobody in the room has the job of asking *"do we even need this?"* — so nobody does.
 
 Megazord gives that job to one Zord in the critique round. It climbs a ladder and
@@ -205,7 +207,7 @@ MEGAZORD_PRUNER=none     # turn it off
 
 ## ❓ FAQ
 
-**Do I need all four CLIs?** No. Two is enough. Claude is the referee, so it's recommended, but Megazord adapts to whoever's online.
+**Do I need all six CLIs?** No. Two is enough. Claude is the referee, so it's recommended, but Megazord adapts to whoever's online.
 
 **Does this cost money per run?** Billing depends on the provider configuration. The optional Z.AI adapter uses a Coding Plan key. Run `megazord cost` to see the token magnitude (reference only).
 
@@ -232,5 +234,5 @@ Megazord is an independent, unofficial **fan project**. It is **not affiliated w
 
 <div align="center">
 <br>
-<b>🦖 Four AIs. Zero drama. Go go Megazord.</b>
+<b>🦖 Six AIs. Zero drama. Go go Megazord.</b>
 </div>

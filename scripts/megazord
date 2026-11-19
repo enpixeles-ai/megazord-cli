@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# 🤖🦖 MEGAZORD — 4 Zords (CLIs de IA) se combinan en un consejo.
-#   🔴 Tyranno=Claude (líder)  ⚫ Mastodon=Codex  🔵 Triceratops=Kimi  🩷 Pterodactyl=Gemini
+# 🤖🦖 MEGAZORD — hasta 6 Zords (CLIs de IA) se combinan en un consejo.
+#   🔴 Tyranno=Claude (líder)  ⚫ Mastodon=Codex  🔵 Triceratops=Kimi  🩷 Pterodactyl=Antigravity (Google)  🐯 Saberdiente=ZCode (Z.AI)  🐉 Dragonzord=DeepSeek (OpenCode)
 #
-#   megazord                       -> 🦖 Zord roll call (estado de los 4 Zords)
+#   megazord                       -> 🦖 Zord roll call (estado de los Zords)
 #   megazord "tu pregunta"         -> los Zords debaten y dan la directriz (no toca archivos)
 #   megazord ejecuta "tu tarea"    -> "¡Megazord, fórmate!" → se combinan y construyen
-#   megazord revisa                -> los 4 Zords revisan tu git diff
+#   megazord revisa                -> los Zords revisan tu git diff
 #
 # Motor: council-dev (sobre la carpeta actual). Usa tus suscripciones, no API keys.
 set -euo pipefail
@@ -35,7 +35,7 @@ case "${1:-}" in
       power-chamber . >/dev/null 2>&1 &
       sleep 1
     fi
-    echo "🦖 ¡Megazord, fórmate! Repartiendo la misión entre los 4 Zords..."
+    echo "🦖 ¡Megazord, fórmate! Repartiendo la misión entre los Zords..."
     council-dev execute "$*" --repo . --approve --fanout
     ;;
   revisa|revisar|review )

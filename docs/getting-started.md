@@ -10,11 +10,11 @@
 | 🦖 Claude *(referee — recommended)* | `npm i -g @anthropic-ai/claude-code` | run `claude` |
 | 🐘 Codex | `npm i -g @openai/codex` | run `codex` |
 | 🛡️ Kimi | `npm i -g @moonshot-ai/kimi-code` | `kimi login` |
-| 🦅 Gemini | `npm i -g @google/gemini-cli` | run `gemini` or use authenticated `agy` |
-| Saberdiente | Z.AI Coding Plan | GLM debate, optionally builds via a configured CLI |
-| Dragonzord | DeepSeek via OpenCode | Isolated read-only debate and approved edits |
+| 🦅 Antigravity | install Google Antigravity (provides `agy`); Gemini CLI is the fallback | run `agy` and sign in |
+| 🐯 Saberdiente | Z.AI ZCode Coding Plan | set `ZAI_API_KEY` or sign in to ZCode |
+| 🐉 Dragonzord | `npm i -g opencode-ai` | nothing: the DeepSeek model used is free |
 
-All six are optional. A council needs two responding voices. Run `megazord doctor` for local detection or `megazord doctor --vivo` to send a real request to each available provider. Chimerazord reviews the current tracked diff with the available specialties.
+All six are optional. A council needs two responding voices. Run `megazord doctor` for local detection or `megazord doctor --vivo` to send a real request to each available provider. Chimerazord turns the available Zords into simulated attackers on your own repo and returns one prioritized security report.
 
 | Optional environment variable | Purpose |
 |---|---|

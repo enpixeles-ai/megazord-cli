@@ -33,7 +33,7 @@
 
   <!-- tagline -->
   <text x="640" y="238" text-anchor="middle" font-size="24" font-weight="600" fill="#E6EDF3">
-    Four AI coding CLIs. One council. They debate, agree, and build.
+    Six AI coding CLIs. One council. They debate, agree, and build.
   </text>
   <text x="640" y="266" text-anchor="middle" font-size="16" fill="#8B949E">
     Runs on the subscriptions you already pay for — not per-token API keys.
