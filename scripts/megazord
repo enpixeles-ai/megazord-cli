@@ -41,8 +41,13 @@ case "${1:-}" in
   revisa|revisar|review )
     council-dev review --repo .
     ;;
+  chimerazord )
+    shift
+    council-dev chimerazord "$@" --repo .
+    ;;
   doctor|estado )
-    council-dev doctor
+    shift
+    council-dev doctor "$@"
     ;;
   costo|costos|tokens|consumo )
     council-dev costo --repo .

@@ -12,9 +12,9 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-A855F7.svg)](CONTRIBUTING.md)
 [![Stars](https://img.shields.io/github/stars/enpixeles-ai/megazord-cli?style=social)](https://github.com/enpixeles-ai/megazord-cli)
 
-**Megazord convenes Claude, Codex, Kimi and Gemini** as a team: they each analyze your task, critique each other's proposals, reach a single arbitrated directive, and then **split the work by strength and build it** — with automatic verification gates.
+**Megazord convenes up to six coding assistants** as a team: they each analyze your task, critique each other's proposals, reach a single arbitrated directive, and then **split the work by strength and build it** — with automatic verification gates.
 
-It runs on the **CLI subscriptions you already pay for** — not per-token API keys.
+It uses your configured providers, including an optional Z.AI Coding Plan credential.
 
 ```bash
 megazord "how do I make this API 3x faster without breaking auth?"     # debate → directive
@@ -42,7 +42,7 @@ megazord mission "add rate limiting to the login endpoint"             # debate 
 
 ## Why
 
-One AI is one opinion. Ask four strong models the same coding question and you get something better than any of them alone: a **debate**. One catches the bug another missed. One over-engineers, another simplifies. A referee (Claude, the architect) synthesizes the best of each into a single plan — then the four **build it in parallel**, each doing what it's best at.
+One AI is one opinion. Ask up to six strong models the same coding question and you get something better than any of them alone: a **debate**. One catches the bug another missed. One over-engineers, another simplifies. A referee (Claude, the architect) synthesizes the best of each into a single plan — then the four **build it in parallel**, each doing what it's best at.
 
 Most multi-agent tools bill you per token through APIs. **Megazord shells out to the CLIs you're already logged into** (Claude Code, Codex CLI, Kimi CLI, Gemini CLI). If you pay flat monthly subscriptions, your marginal cost per council is effectively **$0**.
 
@@ -53,7 +53,24 @@ Most multi-agent tools bill you per token through APIs. **Megazord shells out to
 | 🦖 **Tyranno** | Claude | Architect & referee — synthesizes the directive, owns critical/production code, final integration |
 | 🐘 **Mastodon** | Codex | Surgical editor — precise refactors, tests, single-file fixes |
 | 🛡️ **Triceratops** | Kimi | Workhorse — volume, scaffolding, new files, migrations |
-| 🦅 **Pterodactyl** | Gemini | Recon — research, QA, docs, end-to-end tests |
+| 🦅 **Pterodactyl** | Antigravity or Gemini CLI | Recon — research, QA, docs, end-to-end tests |
+| Saberdiente | Z.AI Coding Plan | GLM debate, optionally builds via a configured CLI |
+| Dragonzord | DeepSeek via OpenCode | Isolated read-only debate and approved edits |
+
+All six are optional. A council needs two responding voices. Run `megazord doctor` for local detection or `megazord doctor --vivo` to send a real request to each available provider. Chimerazord reviews the current tracked diff with the available specialties.
+
+| Optional environment variable | Purpose |
+|---|---|
+| `MEGAZORD_CLAUDE_MODEL` | Claude model (default `opus`) |
+| `MEGAZORD_GEMINI_MODEL` | Antigravity model (default `gemini-3.8-flash-high`) |
+| `MEGAZORD_OPENCODE_BIN`, `MEGAZORD_DEEPSEEK_MODEL` | OpenCode executable and model (defaults: `opencode`, `opencode/deepseek-v4.1-flash-free`) |
+| `ZAI_API_KEY` | Z.AI Coding Plan credential. Falls back to the ZCode coding-plan provider configuration. |
+| `MEGAZORD_ZAI_MODEL`, `MEGAZORD_ZAI_MAX_TOKENS` | GLM model and response budget (defaults: `GLM-5.3`, 24000) |
+| `MEGAZORD_ZAI_CLI` | Executable for a Claude Code instance configured for Z.AI. Enables editing. |
+| `MEGAZORD_SUBAGENTES` | Additional Codex threads (default 0) |
+| `MEGAZORD_KNOWLEDGE_CMD` | Optional executable taking the task as one argument. Its stdout becomes council evidence. Disable with `council-dev consensus "task" --no-knowledge`. |
+| `MEGAZORD_LANG` | Output language, English by default or `es` for Spanish |
+
 
 ## 🚀 Quick start
 
@@ -62,7 +79,7 @@ Most multi-agent tools bill you per token through APIs. **Megazord shells out to
 Megazord orchestrates existing CLIs — install and log into the ones you have:
 
 ```bash
-npm i -g @anthropic-ai/claude-code   # 🦖 Claude  (required — it's the referee)
+npm i -g @anthropic-ai/claude-code   # 🦖 Claude  (optional referee)
 npm i -g @openai/codex               # 🐘 Codex   (optional)
 npm i -g @moonshot-ai/kimi-code      # 🛡️ Kimi    (optional)
 npm i -g @google/gemini-cli          # 🦅 Gemini  (optional)
@@ -190,7 +207,7 @@ MEGAZORD_PRUNER=none     # turn it off
 
 **Do I need all four CLIs?** No. Two is enough. Claude is the referee, so it's recommended, but Megazord adapts to whoever's online.
 
-**Does this cost money per run?** Only what your subscriptions already cost. Megazord doesn't use API keys — it drives CLIs you're logged into. Run `megazord cost` to see the token magnitude (reference only).
+**Does this cost money per run?** Billing depends on the provider configuration. The optional Z.AI adapter uses a Coding Plan key. Run `megazord cost` to see the token magnitude (reference only).
 
 **Is it safe? Can it wreck my repo?** Debating never touches files. Building only runs with explicit approval, one verify command per step (from a safe allow-list), and everything is logged. Use `git` and you can revert any run.
 

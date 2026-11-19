@@ -3,7 +3,7 @@
 # cada una con su propia Power Chamber.
 #
 # Formato de cada misión:  "<ruta>::<tarea>"
-#   megazord-multi "~/Proyecto/vera::arregla el evaluador de asilo" \
+#   megazord-multi "~/code/mi-app::arregla el login" \
 #                  "~/Proyecto/enpixeles::crea el script de backup"
 #
 # Cada misión corre en su carpeta, en background (sobrevive si cierras la
@@ -12,7 +12,7 @@ set -uo pipefail
 
 if [ $# -eq 0 ]; then
   echo "Uso: megazord-multi \"<ruta>::<tarea>\" [\"<ruta>::<tarea>\" ...]"
-  echo "Ej:  megazord-multi \"~/Proyecto/vera::arregla el login\" \"~/Proyecto/web::agrega tests\""
+  echo "Ej:  megazord-multi \"~/code/mi-app::arregla el login\" \"~/code/web::agrega tests\""
   echo ""
   echo "Ojo: cada misión usa tus suscripciones; 2-3 en paralelo va bien, muchas pueden tocar rate limits."
   exit 1

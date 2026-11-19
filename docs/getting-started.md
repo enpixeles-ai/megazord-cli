@@ -10,7 +10,24 @@
 | 🦖 Claude *(referee — recommended)* | `npm i -g @anthropic-ai/claude-code` | run `claude` |
 | 🐘 Codex | `npm i -g @openai/codex` | run `codex` |
 | 🛡️ Kimi | `npm i -g @moonshot-ai/kimi-code` | `kimi login` |
-| 🦅 Gemini | `npm i -g @google/gemini-cli` | run `gemini` |
+| 🦅 Gemini | `npm i -g @google/gemini-cli` | run `gemini` or use authenticated `agy` |
+| Saberdiente | Z.AI Coding Plan | GLM debate, optionally builds via a configured CLI |
+| Dragonzord | DeepSeek via OpenCode | Isolated read-only debate and approved edits |
+
+All six are optional. A council needs two responding voices. Run `megazord doctor` for local detection or `megazord doctor --vivo` to send a real request to each available provider. Chimerazord reviews the current tracked diff with the available specialties.
+
+| Optional environment variable | Purpose |
+|---|---|
+| `MEGAZORD_CLAUDE_MODEL` | Claude model (default `opus`) |
+| `MEGAZORD_GEMINI_MODEL` | Antigravity model (default `gemini-3.8-flash-high`) |
+| `MEGAZORD_OPENCODE_BIN`, `MEGAZORD_DEEPSEEK_MODEL` | OpenCode executable and model (defaults: `opencode`, `opencode/deepseek-v4.1-flash-free`) |
+| `ZAI_API_KEY` | Z.AI Coding Plan credential. Falls back to the ZCode coding-plan provider configuration. |
+| `MEGAZORD_ZAI_MODEL`, `MEGAZORD_ZAI_MAX_TOKENS` | GLM model and response budget (defaults: `GLM-5.3`, 24000) |
+| `MEGAZORD_ZAI_CLI` | Executable for a Claude Code instance configured for Z.AI. Enables editing. |
+| `MEGAZORD_SUBAGENTES` | Additional Codex threads (default 0) |
+| `MEGAZORD_KNOWLEDGE_CMD` | Optional executable taking the task as one argument. Its stdout becomes council evidence. Disable with `council-dev consensus "task" --no-knowledge`. |
+| `MEGAZORD_LANG` | Output language, English by default or `es` for Spanish |
+
 
 > Megazord uses whatever you're logged into. No API keys required if your CLIs use subscription auth.
 

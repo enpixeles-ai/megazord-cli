@@ -8,13 +8,13 @@
 //     Codex implementacion acotada y tests, Kimi volumen/drafts/procesamiento.
 //   - El debate es SOLO LECTURA. Ejecutar requiere --approve.
 //   - Todo el output va en espanol neutro latinoamericano.
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, createWriteStream, readdirSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { accessSync, statSync, constants, mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, createWriteStream, readdirSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { homedir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 
-const VERSION = "0.11.0";
+const VERSION = "0.12.0";
 
 // Output language of the council. Default English (public repo); set
 // MEGAZORD_LANG=es (or COUNCIL_LANG=es) for Spanish.
@@ -24,14 +24,100 @@ const MAX_PARALLEL = 3; // cap de obreros simultaneos en fan-out
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 
+const local = (en, es) => LANG === "es" ? es : en;
+function installed(command) {
+  if (!command) return false;
+  const paths = command.includes("/") ? [command] : (process.env.PATH || "").split(":").map(dir => join(dir, command));
+  return paths.some(path => {
+    try { accessSync(path, constants.X_OK); return statSync(path).isFile(); } catch { return false; }
+  });
+}
+const agy = installed("agy");
+const GEMINI_MODEL = process.env.MEGAZORD_GEMINI_MODEL || "gemini-3.8-flash-high";
+const OPENCODE_COMMAND = process.env.MEGAZORD_OPENCODE_BIN || "opencode";
+// OpenCode 2 dropped `run --dir` and talks to a shared background service by default.
+// `--standalone` gives each run its own private server, so the temporary HOME is respected.
+let opencodeMajor = null;
+function opencodeVersionMajor() {
+  if (opencodeMajor !== null) return opencodeMajor;
+  const out = spawnSync(OPENCODE_COMMAND, ["--version"], { encoding: "utf8", timeout: 15_000 });
+  const match = String(out.stdout || "").match(/(\d+)\.\d+/);
+  opencodeMajor = match ? Number(match[1]) : 1;
+  return opencodeMajor;
+}
+function opencodeRunArgs(major, model, repo) {
+  return major >= 2
+    ? { args: ["run", "--standalone", "--model", model, "--format", "json"], cwd: repo }
+    : { args: ["run", "--model", model, "--format", "json", "--dir", repo], cwd: null };
+}
+const ZAI_COMMAND = process.env.MEGAZORD_ZAI_CLI;
+const DEEPSEEK_MODEL = (process.env.MEGAZORD_DEEPSEEK_MODEL || "opencode/deepseek-v4.1-flash-free").trim();
+const PERMISOS_LECTURA = { "*": "deny", read: "allow", glob: "allow", grep: "allow", list: "allow",
+  bash: { "*": "deny", true: "allow" }, external_directory: "deny" };
+const DEEPSEEK_PERMISSION = JSON.stringify(PERMISOS_LECTURA);
+const DEEPSEEK_PERMISSION_EDITAR = JSON.stringify({ ...PERMISOS_LECTURA, edit: "allow", write: "allow", apply_patch: "allow" });
+
+// OpenCode 2 silently ignores OPENCODE_PERMISSION: permissions must travel inside the config,
+// and the project's own opencode.json must not be able to widen them.
+function opencodePermissionEnv(major, permisos) {
+  return major >= 2
+    ? { OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: JSON.parse(permisos) }), OPENCODE_DISABLE_PROJECT_CONFIG: "1" }
+    : { OPENCODE_PERMISSION: permisos };
+}
+
+function entornoOpencode(permisos = DEEPSEEK_PERMISSION, major = opencodeVersionMajor()) {
+  const casa = mkdtempSync(join(tmpdir(), "megazord-opencode-"));
+  const env = { HOME: casa, XDG_CONFIG_HOME: join(casa, "config"), XDG_DATA_HOME: join(casa, "data"),
+    XDG_CACHE_HOME: join(casa, "cache"), XDG_STATE_HOME: join(casa, "state"), ...opencodePermissionEnv(major, permisos) };
+  return { casa, env };
+}
+
+function textoDeOpencode(stdout) {
+  const partes = [];
+  let error = null;
+  for (const linea of String(stdout).split("\n")) {
+    let evento;
+    try { evento = JSON.parse(linea); } catch { continue; }
+    if (evento?.type === "text" && evento.part?.text) partes.push(evento.part.text);
+    if (evento?.type === "error") error = evento.error?.data?.message || evento.error?.name || "OpenCode";
+  }
+  return { texto: partes.join("\n").trim(), error };
+}
+function additionalThreads(value) {
+  const count = Number(value);
+  return Number.isSafeInteger(count) && count > 0 && count < Number.MAX_SAFE_INTEGER ? count : 0;
+}
+const CODEX_SUBAGENTES = additionalThreads(process.env.MEGAZORD_SUBAGENTES);
+const CODEX_TOPE_HILOS = ["-c", `features.multi_agent_v2.max_concurrent_threads_per_session=${1 + CODEX_SUBAGENTES}`];
+
+function zaiApiKey(env = process.env, home = homedir()) {
+  if (env.ZAI_API_KEY?.trim()) return env.ZAI_API_KEY.trim();
+  try {
+    const cfg = JSON.parse(readFileSync(join(home, ".zcode", "v2", "config.json"), "utf8"));
+    const key = cfg?.provider?.["builtin:zai-coding-plan"]?.options?.apiKey;
+    return typeof key === "string" && key.trim() ? key.trim() : null;
+  } catch { return null; }
+}
+
+function zaiConfigured() {
+  return Boolean(zaiApiKey());
+}
+
 // Perfiles de capacidad por Zord (CLI). El arbitro asigna por fortaleza y el
 // motor reasigna cuando un Zord no esta disponible o no sabe editar.
 const CLI_PROFILES = {
-  claude: { zord: "Tyranno",      canEdit: true,  reliableEdit: true,  role: "arquitectura/decisiones criticas/integracion final — NO acaparar: solo pasos que exigen juicio de produccion" },
-  codex:  { zord: "Mastodon",     canEdit: true,  reliableEdit: true,  role: "el MEJOR editor quirurgico: refactors precisos, tests, fixes acotados de 1 archivo" },
-  kimi:   { zord: "Triceratops",  canEdit: true,  reliableEdit: false, role: "caballo de batalla: volumen, scaffolding, archivos nuevos, migraciones, Python" },
-  gemini: { zord: "Pterodactyl",  canEdit: true,  reliableEdit: false, role: "research/QA/documentacion/tests E2E/analisis multimodal" },
+  claude: { via: "Claude Code", zord: "Tyranno",      canEdit: true,  reliableEdit: true,  role: "arquitectura/decisiones criticas/integracion final — NO acaparar: solo pasos que exigen juicio de produccion" },
+  codex:  { via: "Codex", zord: "Mastodon",     canEdit: true,  reliableEdit: true,  role: "el MEJOR editor quirurgico: refactors precisos, tests, fixes acotados de 1 archivo" },
+  kimi:   { via: "Kimi", zord: "Triceratops",  canEdit: true,  reliableEdit: false, role: "caballo de batalla: volumen, scaffolding, archivos nuevos, migraciones, Python" },
+  gemini: { via: agy ? "Antigravity" : "Gemini", zord: "Pterodactyl",  canEdit: true,  reliableEdit: false, role: "research/QA/documentacion/tests E2E/analisis multimodal" },
+  zai: { zord: "Saberdiente", via: "Z.AI", canEdit: installed(ZAI_COMMAND) },
+  deepseek: { zord: "Dragonzord", via: "OpenCode", canEdit: installed(OPENCODE_COMMAND) },
 };
+
+function nombreZord(agent) {
+  const profile = CLI_PROFILES[agent];
+  return profile ? profile.zord + " / " + profile.via : agent;
+}
 
 // Verificacion obligatoria: solo se permiten comandos cuyo PRIMER token este en
 // la whitelist, y sin metacaracteres de shell (anti-inyeccion/encadenamiento).
@@ -56,7 +142,8 @@ function usage() {
   return `council-dev ${VERSION}
 
 Uso:
-  council-dev doctor [--json]
+  council-dev doctor [--json] [--vivo]
+  council-dev chimerazord [scope] --repo DIR
   council-dev propose "<tarea>" [--repo DIR] [--timeout-ms N]
   council-dev consensus "<tarea>" [--repo DIR] [--timeout-ms N]
   council-dev execute "<tarea>" --repo DIR --approve [--fanout] [--no-verify] [--timeout-ms N]
@@ -90,7 +177,7 @@ function parseArgs(argv) {
       continue;
     }
     const key = item.slice(2);
-    if (["json", "approve", "fanout", "no-verify", "telegram", "full", "list"].includes(key)) {
+    if (["json", "approve", "fanout", "no-verify", "telegram", "full", "list", "vivo", "no-knowledge"].includes(key)) {
       args[key] = true;
       continue;
     }
@@ -111,9 +198,13 @@ function runProcess(command, args, options = {}) {
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: { ...process.env, ...(options.env ?? {}) },
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     });
 
+    if (child.stdin) {
+      child.stdin.on("error", error => { if (error.code !== "EPIPE") child.kill(); });
+      child.stdin.end(options.input);
+    }
     let stdout = "";
     let stderr = "";
     let timedOut = false;
@@ -159,17 +250,6 @@ function runProcess(command, args, options = {}) {
       });
     });
   });
-}
-
-async function commandExists(command) {
-  const result = await runProcess("sh", ["-lc", `command -v ${shellQuote(command)}`], {
-    timeoutMs: 10_000,
-  });
-  return result.ok && result.stdout.trim().length > 0;
-}
-
-function shellQuote(value) {
-  return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
 // Kimi queda "listo" solo si `kimi login` (device-code flow) persistio el token
@@ -337,13 +417,13 @@ const adapters = {
   // ese modo sesga la salida headless a un resumen meta en vez del contenido.
   // En -p no interactivo las ediciones se deniegan solas => sigue siendo lectura.
   async claudePlan(prompt, repo, options) {
-    const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--add-dir", repo];
+    const args = ["-p", prompt, "--model", process.env.MEGAZORD_CLAUDE_MODEL || "opus", "--output-format", "stream-json", "--verbose", "--add-dir", repo];
     const result = await runProcess("claude", args, { cwd: repo, timeoutMs: options.timeoutMs, logFile: options.logFile });
     return { agent: "claude", ...result, text: trimOutput(parseClaude(result.stdout)) };
   },
   // Claude con escritura (ejecuta pasos del core).
   async claudeWrite(prompt, repo, options) {
-    const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--add-dir", repo];
+    const args = ["-p", prompt, "--model", process.env.MEGAZORD_CLAUDE_MODEL || "opus", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--add-dir", repo];
     const result = await runProcess("claude", args, { cwd: repo, timeoutMs: options.timeoutMs, logFile: options.logFile });
     return { agent: "claude", ...result, text: trimOutput(parseClaude(result.stdout)) };
   },
@@ -351,7 +431,7 @@ const adapters = {
   // deshabilitadas para que NO se ponga a explorar el repo y muera por timeout
   // (ya tiene todas las propuestas en el prompt). Emite directriz + plan de un tiro.
   async claudeArbiter(prompt, repo, options) {
-    const args = ["-p", prompt, "--output-format", "stream-json", "--verbose",
+    const args = ["-p", prompt, "--model", process.env.MEGAZORD_CLAUDE_MODEL || "opus", "--output-format", "stream-json", "--verbose",
       "--disallowedTools", "Bash", "Edit", "Write", "Read", "Glob", "Grep",
       "WebFetch", "WebSearch", "Task", "NotebookEdit", "TodoWrite"];
     const result = await runProcess("claude", args, { cwd: repo, timeoutMs: options.timeoutMs, logFile: options.logFile });
@@ -371,14 +451,14 @@ const adapters = {
     return { agent: "kimi", ...result, text: trimOutput(result.stdout.trim() || result.stderr.trim()) };
   },
   async codexPlan(prompt, repo, options) {
-    const args = ["exec", "--json", "--sandbox", "read-only", "--cd", repo, "--skip-git-repo-check", prompt];
+    const args = ["exec", ...CODEX_TOPE_HILOS, "--json", "--sandbox", "read-only", "--cd", repo, "--skip-git-repo-check", prompt];
     const result = await runProcess("codex", args, { cwd: repo, timeoutMs: options.timeoutMs, logFile: options.logFile });
     return { agent: "codex", ...result, text: trimOutput(extractCodexLastMessage(result.stdout)) };
   },
   async codexExecute(prompt, repo, options) {
     const sandbox = process.env.COUNCIL_CODEX_SANDBOX || "workspace-write";
     const run = (sb) => runProcess("codex",
-      ["exec", "--json", "--sandbox", sb, "--cd", repo, "--skip-git-repo-check", prompt],
+      ["exec", ...CODEX_TOPE_HILOS, "--json", "--sandbox", sb, "--cd", repo, "--skip-git-repo-check", prompt],
       { cwd: repo, timeoutMs: options.timeoutMs, logFile: options.logFile });
     let result = await run(sandbox);
     // En VPS/contenedores sin user-namespaces, bubblewrap revienta el sandbox de
@@ -395,16 +475,68 @@ const adapters = {
     return { agent: "codex", ...result, text: trimOutput(extractCodexLastMessage(result.stdout)) };
   },
   // Gemini (4a voz). En debate, approval-mode plan = solo lectura; en ejecucion, yolo.
+  async deepseekPlan(prompt, repo, options, permisos = DEEPSEEK_PERMISSION) {
+    const { casa, env } = entornoOpencode(permisos);
+    try {
+      const { args, cwd } = opencodeRunArgs(opencodeVersionMajor(), DEEPSEEK_MODEL, repo);
+      // OpenCode 2 resolves the project from PWD, not from the real working directory.
+      const result = await runProcess(OPENCODE_COMMAND, args, { cwd: cwd || casa, env: { ...env, PWD: cwd || casa }, input: prompt, timeoutMs: options.timeoutMs, logFile: options.logFile });
+      const { texto, error } = textoDeOpencode(result.stdout);
+      const ok = result.ok && !error && texto.length > 0;
+      return { agent: "deepseek", provider: "opencode", ...result, ok, stderr: error || result.stderr, text: trimOutput(ok ? texto : (error || result.stderr || "")) };
+    } finally {
+      rmSync(casa, { recursive: true, force: true });
+    }
+  },
+  // Construccion: mismo aislamiento, con edicion dentro del repo y la terminal sin uso.
+  async deepseekWrite(prompt, repo, options) {
+    return adapters.deepseekPlan(prompt, repo, options, DEEPSEEK_PERMISSION_EDITAR);
+  },
+  async zaiWrite(prompt, repo, options) {
+    const args = ["-p", prompt, "--permission-mode", "acceptEdits", "--add-dir", repo];
+    const result = await runProcess(ZAI_COMMAND, args, { cwd: repo, timeoutMs: options.timeoutMs, logFile: options.logFile });
+    return { agent: "zai", provider: "zcode", ...result, text: trimOutput(result.stdout.trim() || result.stderr.trim()) };
+  },
+  async zaiPlan(prompt, repo, options) {
+    const fail = stderr => ({ agent: "zai", ok: false, text: "", stdout: "", stderr });
+    const key = zaiApiKey();
+    if (!key) return fail(local("Missing Z.AI key", "Falta la llave de Z.AI"));
+    try {
+      const response = await fetch("https://api.z.ai/api/anthropic/v1/messages", {
+        method: "POST", redirect: "error", signal: AbortSignal.timeout(options.timeoutMs || DEFAULT_TIMEOUT_MS),
+        headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model: process.env.MEGAZORD_ZAI_MODEL || "GLM-5.3",
+          max_tokens: Number(process.env.MEGAZORD_ZAI_MAX_TOKENS || 24000), messages: [{ role: "user", content: prompt }] }),
+      });
+      if (!response.ok) return fail("HTTP " + response.status);
+      const data = await response.json();
+      const text = data.content.filter(block => block.type === "text").map(block => block.text).join("").trim();
+      return { agent: "zai", ok: Boolean(text), text, stdout: text, stderr: "", usage: data.usage };
+    } catch { return fail(local("Z.AI request failed", "Falló la consulta a Z.AI")); }
+  },
+  async claudeCritique(prompt, repo, options) {
+    const result = await runProcess("claude", ["-p", prompt, "--model", process.env.MEGAZORD_CLAUDE_MODEL || "opus", "--tools", ""], { ...options, cwd: repo });
+    return { agent: "claude", ...result, text: trimOutput(result.stdout) };
+  },
   async geminiPlan(prompt, repo, options) {
+    if (agy) {
+      const result = await runProcess("agy", ["-p", prompt, "--model", GEMINI_MODEL, "--mode", "plan", "--sandbox", "--dangerously-skip-permissions", "--output-format", "text", "--add-dir", repo], { ...options, cwd: repo });
+      return { agent: "gemini", ...result, text: trimOutput(result.stdout) };
+    }
     const args = ["-p", prompt, "--approval-mode", "plan", "--skip-trust", "--output-format", "text"];
     const result = await runProcess("gemini", args, { cwd: repo, timeoutMs: options.timeoutMs, logFile: options.logFile, env: geminiEnv() });
     return { agent: "gemini", ...result, text: trimOutput(result.stdout.trim() || result.stderr.trim()) };
   },
   async geminiWrite(prompt, repo, options) {
+    if (agy) {
+      const result = await runProcess("agy", ["-p", prompt, "--model", GEMINI_MODEL, "--mode", "accept-edits", "--sandbox", "--output-format", "text", "--add-dir", repo], { ...options, cwd: repo });
+      return { agent: "gemini", ...result, text: trimOutput(result.stdout) };
+    }
     const args = ["-p", prompt, "--yolo", "--skip-trust", "--output-format", "text"];
     const result = await runProcess("gemini", args, { cwd: repo, timeoutMs: options.timeoutMs, logFile: options.logFile, env: geminiEnv() });
     return { agent: "gemini", ...result, text: trimOutput(result.stdout.trim() || result.stderr.trim()) };
   },
+
 };
 
 function parseClaude(stdout) {
@@ -477,7 +609,7 @@ Rules:
 }
 
 
-// THE PRUNER — one Zord gets this role in round 2. The other three argue about HOW
+// THE PRUNER — one Zord gets this role in round 2. The others argue about HOW
 // to build; this one asks WHETHER to build. With four models proposing in parallel
 // the bias is to over-deliver: nobody has the job of cutting.
 // Ladder distilled from Ponytail (github.com/DietrichGebert/ponytail, MIT).
@@ -584,7 +716,7 @@ function arbiterPrompt(task, firstRound, critiques) {
     return `Eres el Arquitecto Principal (Claude) y tienes la ultima palabra tecnica. Espanol neutro (tuteo, sin voseo). Recibiste la tarea y las propuestas refinadas del consejo. Sintetiza UNA directriz unica y accionable. No promedies: elige lo mejor de cada propuesta y justifica breve.
 
 REGLA DE LA PODA (no negociable): una de las criticas trae una seccion "## Poda".
-Esa seccion NO es una opinion mas que promedias con las otras tres — es un veto por
+Esa seccion NO es una opinion mas que promedias con las demás — es un veto por
 defecto. Procesala ANTES de armar el plan, punto por punto:
 - Cada elemento podado queda FUERA del plan, salvo que escribas por que es
   imprescindible. La carga de la prueba la tiene quien quiere CONSTRUIR, no quien
@@ -616,7 +748,7 @@ PARTE A — Directriz en markdown:
 ## Riesgo remanente
 
 PARTE B — Plan ejecutable en un unico bloque \`\`\`json al final, con este shape exacto:
-{"pasos":[{"owner":"claude|codex|kimi|gemini","titulo":"...","instruccion":"orden autocontenida","archivos":["ruta/relativa.ext"],"verify":"comando de verificacion"}]}
+{"pasos":[{"owner":"claude|codex|kimi|gemini|zai|deepseek","titulo":"...","instruccion":"orden autocontenida","archivos":["ruta/relativa.ext"],"verify":"comando de verificacion"}]}
 
 Reglas DURAS del plan (el motor las valida y rechaza si fallan):
 - "archivos": lista de rutas RELATIVAS concretas que ese paso va a tocar. NADA de
@@ -645,7 +777,7 @@ Cada "instruccion" debe ser autocontenida (el CLI asignado solo recibe ese texto
   return `You are the Principal Architect (Claude) with the final technical say. Respond in clear English. You received the task and the council's refined proposals. Synthesize ONE single, actionable directive. Don't average: pick the best of each proposal and justify briefly.
 
 PRUNING RULE (non-negotiable): one of the critiques carries a "## Pruned" section.
-That section is NOT just another opinion to average with the other three — it is a
+That section is NOT just another opinion to average with the others — it is a
 veto by default. Process it BEFORE assembling the plan, item by item:
 - Every pruned item stays OUT of the plan unless you write why it is indispensable.
   The burden of proof is on whoever wants to BUILD, not on whoever wants to cut.
@@ -677,7 +809,7 @@ PART A — Directive in markdown:
 ## Remaining risk
 
 PART B — Executable plan in a SINGLE \`\`\`json block at the very end, with this exact shape (the "pasos" key name must be kept literally — the engine parses it):
-{"pasos":[{"owner":"claude|codex|kimi|gemini","titulo":"...","instruccion":"self-contained order","archivos":["relative/path.ext"],"verify":"verification command"}]}
+{"pasos":[{"owner":"claude|codex|kimi|gemini|zai|deepseek","titulo":"...","instruccion":"self-contained order","archivos":["relative/path.ext"],"verify":"verification command"}]}
 
 HARD rules of the plan (the engine validates and rejects on failure):
 - "archivos": list of concrete RELATIVE paths that step will touch. NO globs
@@ -790,17 +922,18 @@ function resolveEditor(preferred, caps) {
     if (o === "gemini") return geminiOk;
     return true; // claude / codex no tienen gate de auth aqui
   };
-  for (const o of [preferred, "codex", "kimi", "claude"]) {
+  for (const o of [preferred, "codex", "kimi", "claude", "gemini", "deepseek", "zai"]) {
     if (CLI_PROFILES[o] && canEdit(o)) return o;
   }
-  return "claude"; // garantia: alguien tiene que editar
+  throw new Error(local("No editor available", "Ningún editor disponible"));
 }
 
 // Reasigna el dueno cuando no esta disponible, no tiene login, o no edita de
 // forma fiable en este entorno (COUNCIL_NO_EDIT).
-function normalizeOwner(step) {
+function normalizeOwner(step, active) {
   const owner = CLI_PROFILES[step.owner] ? step.owner : "claude";
-  const caps = { disabled: noEditOwners(), kimiOk: kimiConfigured(), geminiOk: geminiConfigured() };
+  const caps = { disabled: noEditOwners(), kimiOk: kimiConfigured(), geminiOk: agy || geminiConfigured() };
+  if (active) for (const agent of Object.keys(CLI_PROFILES)) if (!active.includes(agent)) caps.disabled.add(agent);
   const resolved = resolveEditor(owner, caps);
   const reassignedFrom = resolved !== owner ? owner : null;
   return { ...step, owner: resolved, reassignedFrom };
@@ -826,26 +959,20 @@ function dlog(repo, agent, label, options) {
   return { ...options, logFile };
 }
 
+function roster() {
+  const available = { claude: installed("claude"), kimi: installed("kimi") && kimiConfigured(),
+    codex: installed("codex"), gemini: agy || (installed("gemini") && geminiConfigured()),
+    zai: zaiConfigured(), deepseek: installed(OPENCODE_COMMAND) };
+  return Object.keys(available).filter(agent => available[agent]);
+}
+
 async function firstRound(task, repo, options) {
-  const prompt = basePrompt(task);
-  const L = "🧠 debate ronda 1";
-  return Promise.all([
-    adapters.claudePlan(prompt, repo, dlog(repo, "claude", L, options)),
-    adapters.kimiPlan(prompt, repo, dlog(repo, "kimi", L, options)),
-    adapters.codexPlan(prompt, repo, dlog(repo, "codex", L, options)),
-    adapters.geminiPlan(prompt, repo, dlog(repo, "gemini", L, options)),
-  ]);
+  return Promise.all(roster().map(agent => adapters[agent + "Plan"](basePrompt(task), repo, dlog(repo, agent, "1", options))));
 }
 
 async function critiqueRound(task, repo, proposals, options) {
-  const p = (agent) => critiquePrompt(task, proposals, agent);
-  const L = "🧠 critica ronda 2";
-  return Promise.all([
-    adapters.claudePlan(p("claude"), repo, dlog(repo, "claude", L, options)),
-    adapters.kimiPlan(p("kimi"), repo, dlog(repo, "kimi", L, options)),
-    adapters.codexPlan(p("codex"), repo, dlog(repo, "codex", L, options)),
-    adapters.geminiPlan(p("gemini"), repo, dlog(repo, "gemini", L, options)),
-  ]);
+  return Promise.all(proposals.map(({ agent }) => adapters[agent === "claude" ? "claudeCritique" : agent + "Plan"](
+    critiquePrompt(task, proposals, agent), repo, dlog(repo, agent, "2", options))));
 }
 
 async function runConsensus(task, repo, options) {
@@ -857,9 +984,13 @@ async function runConsensus(task, repo, options) {
              `Revisa 'council-dev doctor' (Kimi suele faltar por /login).` };
   }
   const critiques = await critiqueRound(task, repo, liveVoices(proposals), options);
-  const liveCrit = liveVoices(critiques).length ? liveVoices(critiques) : live;
+  const liveCrit = liveVoices(critiques);
+  if (liveCrit.length < 2) return { task, repo, proposals, critiques, directive: null, error: local("Two critiques required", "Se necesitan dos críticas") };
   // El Arquitecto (Claude) sintetiza, en modo plan (solo lectura).
-  const directive = await adapters.claudeArbiter(arbiterPrompt(task, live, liveCrit), repo, dlog(repo, "claude", "🔴 sintetizando directriz", options));
+  const chair = liveCrit.some(v => v.agent === "claude") ? "claude" : liveCrit[0].agent;
+  const arbiter = chair === "claude" ? adapters.claudeArbiter : adapters[chair + "Plan"];
+  const directive = await arbiter(arbiterPrompt(task, live, liveCrit) + "\n" + local("Available editors", "Editores disponibles") + " = " + roster().filter(agent => CLI_PROFILES[agent].canEdit).join(", "), repo, dlog(repo, chair, local("Directive", "Directriz"), options));
+  if (!liveVoices([directive]).length) return { task, repo, proposals, critiques, directive: null, error: local("Missing directive", "Falta la directriz") };
   return { task, repo, proposals, critiques, directive };
 }
 
@@ -895,6 +1026,7 @@ ${step.instruccion}${alcance}`;
   if (owner === "codex") result = await adapters.codexExecute(prompt, repo, adapterOpts);
   else if (owner === "kimi") result = await adapters.kimiWrite(prompt, repo, adapterOpts);
   else if (owner === "gemini") result = await adapters.geminiWrite(prompt, repo, adapterOpts);
+  else if (owner === "zai" || owner === "deepseek") result = await adapters[owner + "Write"](prompt, repo, adapterOpts);
   else result = await adapters.claudeWrite(prompt, repo, adapterOpts);
 
   try {
@@ -1015,39 +1147,29 @@ async function runStepAndVerify(step, repo, options, isGit, doVerify) {
 // --------------------------------------------------------------------------- //
 //  Comandos                                                                    //
 // --------------------------------------------------------------------------- //
+async function preflightInvocation(agent) {
+  const result = await adapters[agent === "claude" ? "claudeCritique" : agent + "Plan"](
+    local("Reply only OK", "Responde solo OK"), process.cwd(), { timeoutMs: 30000 });
+  return result.ok && result.text.trim() === "OK";
+}
+async function preflightVivos(checks) {
+  await Promise.all(checks.filter(item => item.ok).map(async item => {
+    item.ok = await preflightInvocation(item.tool);
+    item.note = item.ok ? local("session checked", "sesión comprobada") : local("session failed", "falló la sesión");
+  }));
+}
 async function doctor(args) {
-  const tools = ["codex", "claude", "kimi", "gemini", "node"];
-  const checks = [];
-  for (const tool of tools) {
-    const exists = await commandExists(tool);
-    const version = exists ? await runProcess(tool, ["--version"], { timeoutMs: 15_000 }) : null;
-    const check = {
-      tool, exists, ok: exists && version?.ok,
-      version: version?.stdout.trim() || version?.stderr.trim() || null,
-    };
-    if (tool === "kimi") {
-      check.authenticated = kimiConfigured();
-      if (check.ok && !check.authenticated) {
-        check.ok = false;
-        check.note = "instalado pero SIN login: corre `kimi login` (device-code) y completa el flujo";
-      }
-    }
-    if (tool === "gemini") {
-      check.authenticated = geminiConfigured();
-      if (check.ok && !check.authenticated) {
-        check.ok = false;
-        check.note = "instalado pero SIN login: corre `gemini`, elige 'Login with Google' (usa tu plan, no API key)";
-      }
-    }
-    checks.push(check);
-  }
-  const result = { ok: checks.every((c) => c.ok), arbiter: "claude", projectRoot, checks };
+  const active = roster();
+  const checks = Object.keys(CLI_PROFILES).map(tool => ({ tool, exists: active.includes(tool), ok: active.includes(tool),
+    note: active.includes(tool) ? local("session not checked", "sesión sin comprobar") : local("unavailable", "no disponible") }));
+  if (args.vivo) await preflightVivos(checks);
+  const result = { ok: !args.vivo || checks.filter(item => item.ok).length >= 2, arbiter: checks.find(item => item.ok)?.tool ?? null, projectRoot, checks };
   if (args.json) {
     console.log(JSON.stringify(result, null, 2));
   } else {
-    console.log(`council-dev ${VERSION}  (arbitro: Claude · ejecucion: reparto por fortalezas)`);
+    console.log(`council-dev ${VERSION}`);
     for (const c of checks) {
-      console.log(`${c.ok ? "OK " : "BAD"} ${c.tool}${c.version ? ` - ${c.version}` : ""}${c.note ? `  (${c.note})` : ""}`);
+      console.log(`${c.ok ? "OK " : "BAD"} ${nombreZord(c.tool)}${c.version ? ` - ${c.version}` : ""}${c.note ? `  (${c.note})` : ""}`);
     }
   }
   return result.ok ? 0 : 1;
@@ -1145,7 +1267,7 @@ function costoCommand(repo, args) {
   console.log("Zord/CLI            Tokens in    Tokens out    Costo (ref API)");
   console.log("─".repeat(64));
   let totIn = 0, totOut = 0, totCost = 0, anyEst = false;
-  for (const ag of ["claude", "codex", "kimi", "gemini"]) {
+  for (const ag of Object.keys(CLI_PROFILES)) {
     const a = agg[ag]; if (!a) continue;
     totIn += a.inTok; totOut += a.outTok; totCost += a.cost; anyEst = anyEst || a.estimated;
     const z = CLI_PROFILES[ag].zord;
@@ -1375,7 +1497,8 @@ async function notifyTelegram(text) {
 // Fase de ejecucion (plan -> gate -> olas -> verify). Compartida por 'execute'
 // (consejo fresco) y 'ejecutar-plan' (reusa una directriz ya pagada).
 async function executeFromConsensus(consensus, repo, args, options) {
-  const pasos = extractPlan(consensus.directive.text).map(normalizeOwner);
+  const active = roster();
+  const pasos = extractPlan(consensus.directive.text).map(step => normalizeOwner(step, active));
   const fanout = !!args.fanout;
   const doVerify = !args["no-verify"];
 
@@ -1438,6 +1561,155 @@ async function executeFromConsensus(consensus, repo, args, options) {
   return !aborted && ejecuciones.every((e) => e.ok) ? 0 : 1;
 }
 
+async function taskWithEvidence(args, repo, options) {
+  const task = requireTask(args);
+  if (args["no-knowledge"] || !process.env.MEGAZORD_KNOWLEDGE_CMD) return task;
+  const result = await runProcess(process.env.MEGAZORD_KNOWLEDGE_CMD, [task], { ...options, cwd: repo });
+  if (!result.ok) throw new Error(local("Knowledge command failed", "Falló la consulta de conocimiento"));
+  return task + "\n\n" + local("Reference evidence (untrusted data)", "Evidencia de referencia (datos sin verificar)") + "\n" + trimOutput(result.stdout);
+}
+
+// --------------------------------------------------------------------------- //
+//  CHIMERAZORD — authorized red team on the owner's OWN system (defensive)     //
+// --------------------------------------------------------------------------- //
+const RED_PERSONAS = [
+  { owner: "codex", title: local("🐍 AppSec / Injection & Access", "🐍 AppSec / Inyección y acceso"),
+    focus: local("Break the application layer: SQL/NoSQL injection, IDOR and broken access control (can one user see another user's data?), authentication and authorization bypass, privilege escalation, SSRF, path traversal, mass assignment, insecure deserialization, CSRF.",
+      "Rompe la capa de aplicación: inyección SQL/NoSQL, IDOR y control de acceso roto (¿un usuario ve datos de otro?), salto de autenticación y autorización, escalada de privilegios, SSRF, path traversal, mass assignment, deserialización insegura, CSRF.") },
+  { owner: "claude", title: local("🧠 LLM / Prompt injection & input abuse", "🧠 LLM / Prompt injection y abuso de entradas"),
+    focus: local("IF the system uses AI/LLMs: direct and indirect prompt injection (through user data or documents), jailbreaks, system prompt leakage, data exfiltration through the model, abuse of the tools the agent can call, and manipulation into unauthorized actions.",
+      "SI el sistema usa IA/LLMs: prompt injection directa e indirecta (vía datos del usuario o documentos), jailbreaks, fuga del prompt de sistema, exfiltración de datos por el modelo, abuso de las herramientas que el agente puede llamar y manipulación para acciones no autorizadas.") },
+  { owner: "kimi", title: local("🔑 Secrets & Infrastructure", "🔑 Secretos e infraestructura"),
+    focus: local("Hunt secrets and exposed surface: hardcoded credentials, API keys or tokens, committed or reachable .env files, unprotected debug or admin endpoints, PII or secrets in logs, backups or public paths, vulnerable dependencies, loose CORS and headers, insecure storage.",
+      "Caza secretos y superficie expuesta: credenciales, llaves o tokens escritos en el código, .env versionado o accesible, endpoints de depuración o administración sin proteger, PII o secretos en logs, copias o rutas públicas, dependencias vulnerables, CORS y cabeceras laxas, almacenamiento inseguro.") },
+  { owner: "gemini", title: local("💰 Business logic, Payments & Phishing", "💰 Lógica de negocio, pagos y phishing"),
+    focus: local("Abuse business logic: price or billing manipulation, skipping payment, broken multi-tenant isolation (one customer's data reaching another), account takeover, weak password reset, race conditions in sensitive operations, and phishing vectors aimed at the product's users.",
+      "Abusa de la lógica de negocio: manipulación de precios o cobros, saltarse el pago, aislamiento multi-cliente roto (datos de un cliente que llegan a otro), robo de cuenta, recuperación de contraseña débil, carreras en operaciones sensibles y vectores de phishing contra los usuarios del producto.") },
+  { owner: "zai", title: local("🦷 Systemic failures, Fail-open & Chain of trust", "🦷 Fallos sistémicos, fail-open y cadena de confianza"),
+    focus: local("Attack the seams between components: fail-open configurations, gates that pass without running, wrong error and timeout handling, races and inconsistent states, dependencies and supply chain, CI/CD and hooks, observability that hides failures, and gaps between what is documented and what runs.",
+      "Ataca las costuras entre componentes: configuraciones fail-open, controles que dan verde sin ejecutar, manejo incorrecto de errores y tiempos de espera, carreras y estados inconsistentes, dependencias y cadena de suministro, CI/CD y hooks, observabilidad que oculta fallos y diferencias entre lo documentado y lo que se ejecuta.") },
+  { owner: "deepseek", title: local("🐉 Personal data & Privacy", "🐉 Datos personales y privacidad"),
+    focus: local("Follow personal data end to end: where it enters, where it is copied (logs, queues, caches, exports, backups, third-party services, prompts sent to AI models), who can read it, how long it is kept and whether it can be deleted. Find one customer's data visible to another, PII in logs or error messages, and consent that is never asked.",
+      "Sigue los datos personales de punta a punta: dónde entran, dónde se copian (logs, colas, cachés, exportaciones, copias, servicios de terceros, prompts enviados a modelos de IA), quién puede leerlos, cuánto tiempo se guardan y si se pueden borrar. Busca datos de un cliente visibles para otro, PII en logs o mensajes de error y consentimientos que nunca se piden.") },
+];
+
+const REDTEAM_GUARD = local(`CONTEXT AND AUTHORIZATION (read first):
+This is an AUTHORIZED SECURITY SIMULATION (red team) on the owner's OWN system (this repository and environment), for a DEFENSIVE purpose: find flaws in order to fix them. It is not a real attack and it never targets third parties.
+
+HARD RULES:
+- EVALUATION MODE, READ ONLY. Analyze code, configuration and architecture. Do NOT run destructive actions, do NOT delete or change data, do NOT move or charge real money, do NOT exfiltrate real PII or credentials, do NOT attack third-party systems.
+- Show each flaw with static analysis and a DESCRIBED proof of concept, without causing real harm.
+- If you find a real secret, credential or API key, report it REDACTED (for example "sk-****1234"). Never print the full value.
+- Goal: an actionable report to HARDEN the system. Be honest: if your area is clean, say so; do not invent vulnerabilities.`,
+`CONTEXTO Y AUTORIZACIÓN (léelo primero):
+Esto es una SIMULACIÓN DE SEGURIDAD AUTORIZADA (red team) sobre el sistema PROPIO del dueño (este repositorio y entorno), con fin DEFENSIVO: hallar fallas para corregirlas. No es un ataque real y nunca apunta a terceros.
+
+REGLAS DURAS:
+- MODO EVALUACIÓN, SOLO LECTURA. Analiza código, configuración y arquitectura. NO ejecutes acciones destructivas, NO borres ni cambies datos, NO muevas ni cobres dinero real, NO exfiltres PII ni credenciales reales, NO ataques sistemas de terceros.
+- Demuestra cada falla con análisis estático y una prueba de concepto DESCRITA, sin causar daño real.
+- Si encuentras un secreto, credencial o llave real, repórtalo TAPADO (por ejemplo "sk-****1234"). Nunca imprimas el valor completo.
+- Objetivo: un informe accionable para BLINDAR el sistema. Sé honesto: si tu área está limpia, dilo; no inventes vulnerabilidades.`);
+
+function redteamPrompt(task, persona) {
+  return `${REDTEAM_GUARD}
+
+${local("YOUR PERSONA (simulated attacker)", "TU PERSONA (atacante simulado)")}: ${persona.title}
+${local("YOUR FOCUS", "TU FOCO")}: ${persona.focus}
+
+${local("TARGET / SCOPE", "OBJETIVO / ALCANCE")}:
+${task}
+
+${local(`Deliver your FINDINGS as a list. Each finding:
+- **Title** + **Severity** (Critical / High / Medium / Low)
+- **Attack path** (how it would be exploited, step by step, without actually doing it)
+- **Evidence** (file:line, endpoint or config that allows it, if you can see it)
+- **Hardening** (the concrete fix)
+Prioritize what is REAL and exploitable in your area. No filler.`,
+`Entrega tus HALLAZGOS como lista. Cada hallazgo:
+- **Título** + **Severidad** (Crítica / Alta / Media / Baja)
+- **Ruta de ataque** (cómo se explotaría, paso a paso, sin hacerlo de verdad)
+- **Evidencia** (archivo:línea, endpoint o configuración que lo permite, si la ves)
+- **Blindaje** (la corrección concreta)
+Prioriza lo REAL y explotable de tu área. Nada de relleno.`)}`;
+}
+
+function redteamSynthPrompt(task, attacks) {
+  const body = attacks.map((p) => `## ${nombreZord(p.agent)}\n${capForPrompt(p.text || p.stderr || local("[no output]", "[sin salida]"))}`).join("\n\n");
+  return local(`You are the CISO of this red team exercise.
+
+CRITICAL RULE: do NOT use tools, do NOT read files, do NOT explore. The attacker reports are below. Consolidate and answer NOW.
+
+AUDITED TARGET:
+${task}
+
+ATTACKER REPORTS:
+${body}
+
+Deliver ONE consolidated, prioritized security report (markdown):
+## Executive summary
+(1 paragraph: overall risk level and the most serious issue)
+## Prioritized findings
+(ordered by severity × exploitability; merge duplicates; drop false positives. Each one: severity, attack path, evidence, concrete hardening)
+## Quick wins
+(fast, high-impact fixes that can be done NOW)
+## Phased remediation plan
+(what to harden first and in what order)
+
+Rules: secrets always REDACTED. Be honest about real severity; do not inflate or minimize.`,
+`Eres el CISO de este ejercicio de red team.
+
+REGLA CRÍTICA: NO uses herramientas, NO leas archivos, NO explores. Abajo están los reportes de los atacantes. Consolida y responde YA.
+
+OBJETIVO AUDITADO:
+${task}
+
+REPORTES DE LOS ATACANTES:
+${body}
+
+Entrega UN informe de seguridad consolidado y priorizado (markdown):
+## Resumen ejecutivo
+(1 párrafo: nivel de riesgo general y lo más grave)
+## Hallazgos priorizados
+(ordenados por severidad × explotabilidad; fusiona duplicados; descarta falsos positivos. Cada uno: severidad, ruta de ataque, evidencia, blindaje concreto)
+## Arreglos rápidos
+(correcciones rápidas de alto impacto que se pueden hacer YA)
+## Plan de remediación por fases
+(qué blindar primero y en qué orden)
+
+Reglas: secretos siempre TAPADOS. Honestidad sobre la severidad real; no infles ni minimices.`);
+}
+
+function redteamRoster(active) { return RED_PERSONAS.filter((persona) => active.includes(persona.owner)); }
+
+async function chimera(repo, options, scope) {
+  if (!scope.trim()) throw new Error(local("Usage: council-dev chimerazord \"<scope>\" --repo DIR", "Uso: council-dev chimerazord \"<alcance>\" --repo DIR"));
+  const personas = redteamRoster(roster());
+  if (personas.length < 2) {
+    console.error(local("Chimerazord needs at least two available Zords. Run `council-dev doctor`.", "Chimerazord necesita al menos dos Zords disponibles. Corre `council-dev doctor`."));
+    return 1;
+  }
+  const opts = { ...options, timeoutMs: Math.max(options.timeoutMs || DEFAULT_TIMEOUT_MS, 300_000) };
+  console.log(`\n🕷️  CHIMERAZORD — ${local("authorized red team (read only · defensive)", "red team autorizado (solo lectura · fin defensivo)")}`);
+  const attacks = await Promise.all(personas.map((persona) =>
+    adapters[`${persona.owner}Plan`](redteamPrompt(scope, persona), repo, dlog(repo, persona.owner, `chimerazord · ${persona.title}`, opts))));
+  for (const attack of attacks) printAgentSection(`${local("ATTACK", "ATAQUE")} — ${nombreZord(attack.agent)}`, attack);
+  const live = liveVoices(attacks);
+  const missing = personas.map((persona) => persona.owner).filter((owner) => !live.some((voice) => voice.agent === owner));
+  if (live.length < 2) {
+    const file = writeRun(repo, "chimerazord-incomplete", { task: scope, repo, attacks, missing });
+    console.error(`\n🛑 ${local("Fewer than two attackers delivered; no report is generated.", "Menos de dos atacantes entregaron; no se genera informe.")} ${file}`);
+    return 1;
+  }
+  if (missing.length) console.error(`⚠️  ${local("Attackers without output", "Atacantes sin salida")}: ${missing.join(", ")}`);
+  const chair = live.some((voice) => voice.agent === "claude") ? "claude" : live[0].agent;
+  const arbiter = chair === "claude" ? adapters.claudeArbiter : adapters[`${chair}Plan`];
+  const report = await arbiter(redteamSynthPrompt(scope, live), repo, dlog(repo, chair, "chimerazord · CISO", opts));
+  printAgentSection(`🛡️  ${local("SECURITY REPORT", "INFORME DE SEGURIDAD")} (CISO: ${nombreZord(chair)})`, report);
+  const file = writeRun(repo, "chimerazord", { task: scope, repo, attacks, missing, report, chair });
+  console.log(`\n${local("Transcript", "Transcripción")}: ${file}`);
+  return report.ok && (report.text || "").trim().length > 0 ? 0 : 1;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const command = args._[0];
@@ -1455,6 +1727,7 @@ async function main() {
   if (!existsSync(repo)) throw new Error(`El repo no existe: ${repo}`);
   const options = { timeoutMs: timeoutMs(args) };
 
+  if (command === "chimerazord") return chimera(repo, options, args._.slice(1).join(" "));
   if (command === "costo") return costoCommand(repo, args);
   if (command === "desempeno" || command === "stats") return desempenoCommand(repo);
   if (command === "sesion" || command === "actas") {
@@ -1462,7 +1735,7 @@ async function main() {
   }
 
   if (command === "propose") {
-    const task = requireTask(args);
+    const task = await taskWithEvidence(args, repo, options);
     const proposals = await firstRound(task, repo, options);
     const file = writeRun(repo, "propose", { task, repo, proposals });
     for (const p of proposals) printAgentSection(p.agent, p);
@@ -1471,7 +1744,7 @@ async function main() {
   }
 
   if (command === "consensus") {
-    const task = requireTask(args);
+    const task = await taskWithEvidence(args, repo, options);
     const result = await runConsensus(task, repo, options);
     const file = writeRun(repo, "consensus", result);
     if (result.error) {
@@ -1485,7 +1758,7 @@ async function main() {
   }
 
   if (command === "execute") {
-    const task = requireTask(args);
+    const task = await taskWithEvidence(args, repo, options);
     if (!args.approve) throw new Error("Me niego a ejecutar sin --approve");
     const consensus = await runConsensus(task, repo, options);
     if (!consensus.directive) {
@@ -1577,6 +1850,24 @@ function selftest() {
   ok(resolveEditor("kimi", { disabled: new Set(), kimiOk: true }) === "kimi", "kimi con auth se respeta");
   ok(resolveEditor("kimi", { disabled: new Set(), kimiOk: false }) === "codex", "kimi sin auth -> codex (fiable)");
 
+  ok(!installed("") && !installed("/nonexistent/megazord-tool"), "optional tools");
+  ok(!zaiApiKey({}, "/nonexistent/megazord-home"), "Z.AI without key");
+  ok(JSON.parse(DEEPSEEK_PERMISSION)["*"] === "deny" && !JSON.parse(DEEPSEEK_PERMISSION).edit && JSON.parse(DEEPSEEK_PERMISSION_EDITAR).edit === "allow", "OpenCode permissions");
+  ok(textoDeOpencode('{"type":"text","part":{"text":"OK"}}').texto === "OK" && textoDeOpencode('{"type":"error"}').error, "OpenCode stream");
+  ok(additionalThreads(undefined) === 0 && additionalThreads("-1") === 0 && additionalThreads("3") === 3, "Codex configuration");
+  ok(CODEX_TOPE_HILOS[1].endsWith("=" + (1 + CODEX_SUBAGENTES)), "Codex thread cap");
+  ok(RED_PERSONAS.every((_, n, all) => redteamRoster(all.slice(0, n + 1).map((p) => p.owner)).length === n + 1), "Chimerazord N reviewers");
+  // Chimerazord completo: seis personas, solo las disponibles, barandas defensivas.
+  ok(RED_PERSONAS.length === 6 && new Set(RED_PERSONAS.map((p) => p.owner)).size === 6, "chimerazord: six distinct attackers");
+  ok(redteamRoster(["codex", "deepseek"]).map((p) => p.owner).join() === "codex,deepseek", "chimerazord: only available attackers");
+  ok(/READ ONLY|SOLO LECTURA/.test(REDTEAM_GUARD) && /REDACTED|TAPADO/.test(REDTEAM_GUARD), "chimerazord: defensive guard");
+  ok(redteamPrompt("scope X", RED_PERSONAS[0]).includes("scope X"), "chimerazord: prompt carries the scope");
+  // OpenCode 1 usa --dir; OpenCode 2 usa servidor privado y la carpeta como cwd.
+  ok(opencodeRunArgs(1, "m", "/r").args.includes("--dir"), "opencode v1 uses --dir");
+  ok(JSON.parse(opencodePermissionEnv(2, DEEPSEEK_PERMISSION).OPENCODE_CONFIG_CONTENT).permission.edit === undefined, "opencode v2: debate permissions travel in config, read only");
+  ok(opencodePermissionEnv(2, DEEPSEEK_PERMISSION).OPENCODE_DISABLE_PROJECT_CONFIG === "1", "opencode v2: project config cannot widen permissions");
+  ok(opencodePermissionEnv(1, DEEPSEEK_PERMISSION).OPENCODE_PERMISSION === DEEPSEEK_PERMISSION, "opencode v1 keeps OPENCODE_PERMISSION");
+  ok(opencodeRunArgs(2, "m", "/r").cwd === "/r" && opencodeRunArgs(2, "m", "/r").args.includes("--standalone") && !opencodeRunArgs(2, "m", "/r").args.includes("--dir"), "opencode v2 uses --standalone and cwd");
   console.log(`selftest: ${pass} OK, ${fail} fallos`);
   return fail === 0 ? 0 : 1;
 }
