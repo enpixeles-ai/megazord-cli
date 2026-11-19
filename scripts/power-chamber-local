@@ -20,12 +20,10 @@ ZORDS=(
 )
 
 pane() {
+  # Cabecera sin marco fijo: la raya mide lo que mida el cuadro, así no se rompe en pantallas chicas.
   local col="$1" name="$2" role="$3" log="$4"
-  echo "printf '\\033[1;${col}m'; \
-printf '╔══════════════════════════════════════╗\\n'; \
-printf '║  %-36s║\\n' '$name'; \
-printf '║  \\033[0;${col}m%-36s\\033[1;${col}m║\\n' '$role'; \
-printf '╚══════════════════════════════════════╝\\033[0m\\n'; \
+  echo "sleep 0.5; printf '\\033[1;${col}m%s\\n\\033[0;${col}m%s\\n' '$name' '$role'; \
+printf '%*s\\033[0m\\n' \"\$(tput cols)\" '' | tr ' ' '─'; \
 tail -n 40 -f '$D/$log.log'"
 }
 
